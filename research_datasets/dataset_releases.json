@@ -1,0 +1,310 @@
+{
+  "captured_at_utc": "2026-10-02T20:14:56+00:00",
+  "huggingface": [
+    {
+      "repo": "Yqy6/Slides-Align",
+      "url": "https://huggingface.co/datasets/Yqy6/Slides-Align",
+      "http_status": 200,
+      "revision": "2f50ac6674a506acb245275e58c8a452c00e6a14",
+      "used_storage_bytes": 57073806859,
+      "file_count_reported": 100000,
+      "gated": false,
+      "license_name": "mit",
+      "license_url": null,
+      "task_categories": [
+        "other"
+      ],
+      "language": [
+        "en"
+      ],
+      "size_categories": null,
+      "dataset_configs": null,
+      "dataset_splits": null,
+      "download_size_bytes": null,
+      "dataset_size_bytes": null,
+      "tags": [
+        "license:mit",
+        "size_categories:n<1K"
+      ]
+    },
+    {
+      "repo": "NTT-hil-insight/SlideVQA",
+      "url": "https://huggingface.co/datasets/NTT-hil-insight/SlideVQA",
+      "http_status": 200,
+      "revision": "e780ea258d734958befbfaed19fa059584642ca8",
+      "used_storage_bytes": 10904324390,
+      "file_count_reported": 77,
+      "gated": "auto",
+      "license_name": null,
+      "license_url": null,
+      "task_categories": [
+        "visual-question-answering",
+        "question-answering"
+      ],
+      "language": [
+        "en"
+      ],
+      "size_categories": [
+        "10K<n<100K"
+      ],
+      "dataset_configs": null,
+      "dataset_splits": [
+        {
+          "name": "val",
+          "num_bytes": 4402684721.836,
+          "num_examples": 1652
+        },
+        {
+          "name": "test",
+          "num_bytes": 5866439740.465,
+          "num_examples": 2215
+        },
+        {
+          "name": "train",
+          "num_bytes": 26414013350.619,
+          "num_examples": 10617
+        }
+      ],
+      "download_size_bytes": 10904324390,
+      "dataset_size_bytes": 36683137812.92,
+      "tags": [
+        "size_categories:10K<n<100K"
+      ]
+    },
+    {
+      "repo": "Wenkaiwang/PPTBench-V3",
+      "url": "https://huggingface.co/datasets/Wenkaiwang/PPTBench-V3",
+      "http_status": 200,
+      "revision": "608f01bf879d6870475f37b370c685a0b8938987",
+      "used_storage_bytes": 5820620613,
+      "file_count_reported": 13959,
+      "gated": false,
+      "license_name": "see-provenance-section",
+      "license_url": null,
+      "task_categories": [
+        "other"
+      ],
+      "language": [
+        "zh",
+        "en"
+      ],
+      "size_categories": [
+        "1K<n<10K"
+      ],
+      "dataset_configs": null,
+      "dataset_splits": null,
+      "download_size_bytes": null,
+      "dataset_size_bytes": null,
+      "tags": [
+        "license:other",
+        "size_categories:1K<n<10K"
+      ]
+    },
+    {
+      "repo": "tyrionhuu/PPTBench-Detection",
+      "url": "https://huggingface.co/datasets/tyrionhuu/PPTBench-Detection",
+      "http_status": 200,
+      "revision": "996f3a1c39fe7a3a92c61b72ea03130f3be6129b",
+      "used_storage_bytes": 4756938925,
+      "file_count_reported": 4,
+      "gated": false,
+      "license_name": null,
+      "license_url": null,
+      "task_categories": null,
+      "language": null,
+      "size_categories": null,
+      "dataset_configs": null,
+      "dataset_splits": [
+        {
+          "name": "train",
+          "num_bytes": 712964969.6,
+          "num_examples": 1200
+        }
+      ],
+      "download_size_bytes": 645286505,
+      "dataset_size_bytes": 712964969.6,
+      "tags": [
+        "size_categories:1K<n<10K"
+      ]
+    },
+    {
+      "repo": "tyrionhuu/PPTBench-Understanding",
+      "url": "https://huggingface.co/datasets/tyrionhuu/PPTBench-Understanding",
+      "http_status": 200,
+      "revision": "e174181328947ee78cc59a3b76e92ec9ec17fbed",
+      "used_storage_bytes": 1535130061,
+      "file_count_reported": 3,
+      "gated": false,
+      "license_name": "apache-2.0",
+      "license_url": null,
+      "task_categories": [
+        "question-answering",
+        "table-question-answering"
+      ],
+      "language": [
+        "en"
+      ],
+      "size_categories": [
+        "1K<n<10K"
+      ],
+      "dataset_configs": null,
+      "dataset_splits": [
+        {
+          "name": "train",
+          "num_bytes": 393226298.202,
+          "num_examples": 1039
+        }
+      ],
+      "download_size_bytes": 381550842,
+      "dataset_size_bytes": 393226298.202,
+      "tags": [
+        "license:apache-2.0",
+        "size_categories:1K<n<10K"
+      ]
+    },
+    {
+      "repo": "tyrionhuu/PPTBench-Modification",
+      "url": "https://huggingface.co/datasets/tyrionhuu/PPTBench-Modification",
+      "http_status": 200,
+      "revision": "3fc3c6ec8fda5f4677d23df3647192eac871e148",
+      "used_storage_bytes": 9576250747,
+      "file_count_reported": 4,
+      "gated": false,
+      "license_name": null,
+      "license_url": null,
+      "task_categories": null,
+      "language": null,
+      "size_categories": null,
+      "dataset_configs": null,
+      "dataset_splits": [
+        {
+          "name": "train",
+          "num_bytes": 523553313.762,
+          "num_examples": 1201
+        }
+      ],
+      "download_size_bytes": 467169268,
+      "dataset_size_bytes": 523553313.762,
+      "tags": [
+        "size_categories:1K<n<10K"
+      ]
+    },
+    {
+      "repo": "tyrionhuu/PPTBench-Generation",
+      "url": "https://huggingface.co/datasets/tyrionhuu/PPTBench-Generation",
+      "http_status": 200,
+      "revision": "6cd849e2df37d7da36933e241f9f23bcbd9f8df3",
+      "used_storage_bytes": 3205232269,
+      "file_count_reported": 3,
+      "gated": false,
+      "license_name": null,
+      "license_url": null,
+      "task_categories": null,
+      "language": null,
+      "size_categories": null,
+      "dataset_configs": null,
+      "dataset_splits": [
+        {
+          "name": "train",
+          "num_bytes": 435612376,
+          "num_examples": 800
+        }
+      ],
+      "download_size_bytes": 422280230,
+      "dataset_size_bytes": 435612376,
+      "tags": [
+        "size_categories:n<1K"
+      ]
+    }
+  ],
+  "github": [
+    {
+      "repo": "para-lost/AutoPresent",
+      "url": "https://github.com/para-lost/AutoPresent",
+      "http_status": 200,
+      "revision_branch": "main",
+      "license_spdx": "MIT",
+      "updated_at": "2026-09-21T16:25:32Z",
+      "revision": "98e0c012e89469863d9c3c8bc87eac967d82b2e6",
+      "file_count": 654,
+      "tree_size_bytes": 40449252,
+      "top_level_size_bytes": {
+        "LICENSE": 1076,
+        "README.md": 8282,
+        "SlidesLib": 28052,
+        "autopresent": 9564,
+        "evaluate": 35151,
+        "generate": 62261,
+        "refinement": 29056,
+        "requirements.txt": 58,
+        "scripts": 12214,
+        "setup.py": 177,
+        "slidesbench": 40263361
+      }
+    },
+    {
+      "repo": "zhuohaouw/SlideAudit",
+      "url": "https://github.com/zhuohaouw/SlideAudit",
+      "http_status": 200,
+      "revision_branch": "main",
+      "license_spdx": "NOASSERTION",
+      "updated_at": "2026-05-29T17:24:29Z",
+      "revision": "642d490b7c1d2e78a50a631bfd359433397f3ecf",
+      "file_count": 7207,
+      "tree_size_bytes": 1245717017,
+      "top_level_size_bytes": {
+        ".gitignore": 4769,
+        "LICENSE": 620,
+        "README.md": 4703,
+        "data": 1244930419,
+        "examples": 776506
+      }
+    },
+    {
+      "repo": "nttmdlab-nlp/SlideVQA",
+      "url": "https://github.com/nttmdlab-nlp/SlideVQA",
+      "http_status": 200,
+      "revision_branch": "main",
+      "license_spdx": "NOASSERTION",
+      "updated_at": "2026-09-24T11:10:39Z",
+      "revision": "0d4168a935d60b0b218097205a02fb1133c8bead",
+      "file_count": 14,
+      "tree_size_bytes": 121009505,
+      "top_level_size_bytes": {
+        "LICENSE": 9084,
+        "README.md": 4363,
+        "annotations": 120382889,
+        "download_slides_slideshare.py": 1182,
+        "evaluate.py": 6675,
+        "example.png": 602329,
+        "extract_ocr_tessearct.py": 1247,
+        "extract_ocr_visionAPI.py": 1676,
+        "requirements.txt": 60
+      }
+    },
+    {
+      "repo": "Gastronomicluna/PPTBench-Eval",
+      "url": "https://github.com/Gastronomicluna/PPTBench-Eval",
+      "http_status": 200,
+      "revision_branch": "main",
+      "license_spdx": "MIT",
+      "updated_at": "2026-09-22T19:02:47Z",
+      "revision": "03c9706f4dc8d4eac6852511fa02764b9675b03e",
+      "file_count": 101,
+      "tree_size_bytes": 1481374,
+      "top_level_size_bytes": {
+        ".github": 250,
+        ".gitignore": 296,
+        ".pre-commit-config.yaml": 1077,
+        "LICENSE": 1066,
+        "README.md": 3623,
+        "notebooks": 91870,
+        "pyproject.toml": 1687,
+        "pytest.ini": 24,
+        "setup.cfg": 145,
+        "src": 400892,
+        "tests": 980444
+      }
+    }
+  ]
+}

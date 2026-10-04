@@ -1,0 +1,13 @@
+{
+  "dataset": "SlideAudit",
+  "validated_at_utc": "2026-10-02T20:50:42+00:00",
+  "revision": "642d490b7c1d2e78a50a631bfd359433397f3ecf",
+  "metadata_rows": 2400,
+  "annotations_json": 2400,
+  "descriptions_json": 2400,
+  "images_verified": 2400,
+  "unique_image_sha256": 2311,
+  "duplicate_image_paths": 89,
+  "failures": [],
+  "validation_status": "validated"
+}

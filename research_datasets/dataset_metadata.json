@@ -1,0 +1,142 @@
+{
+  "captured_at_utc": "2026-10-02T20:11:47+00:00",
+  "scope": "public documentation, metadata, and representative SlideAudit samples; no gated assets or code execution",
+  "files": [
+    {
+      "dataset": "slideaudit",
+      "path": "research_datasets/slideaudit/README.md",
+      "url": "https://raw.githubusercontent.com/zhuohaouw/SlideAudit/main/README.md",
+      "size_bytes": 4703,
+      "accessed_at_utc": "2026-10-02T20:12:07+00:00",
+      "status": "downloaded"
+    },
+    {
+      "dataset": "slideaudit",
+      "path": "research_datasets/slideaudit/LICENSE",
+      "url": "https://raw.githubusercontent.com/zhuohaouw/SlideAudit/main/LICENSE",
+      "size_bytes": 620,
+      "accessed_at_utc": "2026-10-02T20:12:10+00:00",
+      "status": "downloaded"
+    },
+    {
+      "dataset": "slideaudit",
+      "path": "research_datasets/slideaudit/metadata.csv",
+      "url": "https://raw.githubusercontent.com/zhuohaouw/SlideAudit/main/data/metadata.csv",
+      "size_bytes": 74051,
+      "accessed_at_utc": "2026-10-02T20:12:12+00:00",
+      "status": "downloaded"
+    },
+    {
+      "dataset": "slideaudit",
+      "path": "research_datasets/slideaudit/sample/annotations/slide_0001.json",
+      "url": "https://raw.githubusercontent.com/zhuohaouw/SlideAudit/main/data/annotations/slide_0001.json",
+      "size_bytes": 3924,
+      "accessed_at_utc": "2026-10-02T20:12:15+00:00",
+      "status": "downloaded"
+    },
+    {
+      "dataset": "slideaudit",
+      "path": "research_datasets/slideaudit/sample/annotations/slide_0002.json",
+      "url": "https://raw.githubusercontent.com/zhuohaouw/SlideAudit/main/data/annotations/slide_0002.json",
+      "size_bytes": 3925,
+      "accessed_at_utc": "2026-10-02T20:12:18+00:00",
+      "status": "downloaded"
+    },
+    {
+      "dataset": "slideaudit",
+      "path": "research_datasets/slideaudit/sample/annotations/slide_0003.json",
+      "url": "https://raw.githubusercontent.com/zhuohaouw/SlideAudit/main/data/annotations/slide_0003.json",
+      "size_bytes": 4434,
+      "accessed_at_utc": "2026-10-02T20:12:21+00:00",
+      "status": "downloaded"
+    },
+    {
+      "dataset": "slideaudit",
+      "path": "research_datasets/slideaudit/sample/descriptions/slide_0001.json",
+      "url": "https://raw.githubusercontent.com/zhuohaouw/SlideAudit/main/data/descriptions/slide_0001.json",
+      "size_bytes": 837,
+      "accessed_at_utc": "2026-10-02T20:12:23+00:00",
+      "status": "downloaded"
+    },
+    {
+      "dataset": "slideaudit",
+      "path": "research_datasets/slideaudit/sample/descriptions/slide_0002.json",
+      "url": "https://raw.githubusercontent.com/zhuohaouw/SlideAudit/main/data/descriptions/slide_0002.json",
+      "size_bytes": 1467,
+      "accessed_at_utc": "2026-10-02T20:12:26+00:00",
+      "status": "downloaded"
+    },
+    {
+      "dataset": "slideaudit",
+      "path": "research_datasets/slideaudit/sample/descriptions/slide_0003.json",
+      "url": "https://raw.githubusercontent.com/zhuohaouw/SlideAudit/main/data/descriptions/slide_0003.json",
+      "size_bytes": 1301,
+      "accessed_at_utc": "2026-10-02T20:12:28+00:00",
+      "status": "downloaded"
+    },
+    {
+      "dataset": "slideaudit",
+      "path": "research_datasets/slideaudit/sample/alteration_example_1.jpg",
+      "url": "https://raw.githubusercontent.com/zhuohaouw/SlideAudit/main/examples/alteration_example_1.jpg",
+      "size_bytes": 357219,
+      "accessed_at_utc": "2026-10-02T20:12:31+00:00",
+      "status": "downloaded"
+    },
+    {
+      "dataset": "slideaudit",
+      "path": "research_datasets/slideaudit/sample/alteration_example_2.jpg",
+      "url": "https://raw.githubusercontent.com/zhuohaouw/SlideAudit/main/examples/alteration_example_2.jpg",
+      "size_bytes": 221884,
+      "accessed_at_utc": "2026-10-02T20:12:34+00:00",
+      "status": "downloaded"
+    },
+    {
+      "dataset": "slideaudit",
+      "path": "research_datasets/slideaudit/sample/alteration_example_3.jpg",
+      "url": "https://raw.githubusercontent.com/zhuohaouw/SlideAudit/main/examples/alteration_example_3.jpg",
+      "size_bytes": 197403,
+      "accessed_at_utc": "2026-10-02T20:12:37+00:00",
+      "status": "downloaded"
+    },
+    {
+      "dataset": "slidesbench",
+      "path": "research_datasets/slidesbench/README.md",
+      "url": "https://raw.githubusercontent.com/para-lost/AutoPresent/main/README.md",
+      "size_bytes": 8282,
+      "accessed_at_utc": "2026-10-02T20:12:40+00:00",
+      "status": "downloaded"
+    },
+    {
+      "dataset": "slidesbench",
+      "path": "research_datasets/slidesbench/LICENSE",
+      "url": "https://raw.githubusercontent.com/para-lost/AutoPresent/main/LICENSE",
+      "size_bytes": 1076,
+      "accessed_at_utc": "2026-10-02T20:12:42+00:00",
+      "status": "downloaded"
+    },
+    {
+      "dataset": "slidesbench",
+      "path": "research_datasets/slidesbench/slidesbench_README.md",
+      "url": "https://raw.githubusercontent.com/para-lost/AutoPresent/main/slidesbench/README.md",
+      "size_bytes": 3397,
+      "accessed_at_utc": "2026-10-02T20:12:45+00:00",
+      "status": "downloaded"
+    },
+    {
+      "dataset": "pptbench",
+      "path": "research_datasets/pptbench/PPTBench-Eval_README.md",
+      "url": "https://raw.githubusercontent.com/Gastronomicluna/PPTBench-Eval/main/README.md",
+      "size_bytes": 3623,
+      "accessed_at_utc": "2026-10-02T20:12:47+00:00",
+      "status": "downloaded"
+    },
+    {
+      "dataset": "pptbench",
+      "path": "research_datasets/pptbench/PPTBench-Eval_LICENSE",
+      "url": "https://raw.githubusercontent.com/Gastronomicluna/PPTBench-Eval/main/LICENSE",
+      "size_bytes": 1066,
+      "accessed_at_utc": "2026-10-02T20:12:50+00:00",
+      "status": "downloaded"
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "dataset": "SlideAudit",
+  "repo": "zhuohaouw/SlideAudit",
+  "revision": "642d490b7c1d2e78a50a631bfd359433397f3ecf",
+  "archive_download_url": "https://api.github.com/repos/zhuohaouw/SlideAudit/tarball/642d490b7c1d2e78a50a631bfd359433397f3ecf",
+  "archive_final_url": "https://api.github.com/repos/zhuohaouw/SlideAudit/tarball/642d490b7c1d2e78a50a631bfd359433397f3ecf",
+  "archive_sha256": "08554a3e1d0074372f450de67ddc8422c4ec16911ce962b35cda4a834036ca14",
+  "archive_size_bytes": 1212030855,
+  "expanded_bytes": 1245717017,
+  "extracted_path": "research_datasets/slideaudit/full_release",
+  "metadata_rows": 2400,
+  "images": 2400,
+  "annotations": 2400,
+  "descriptions": 2400,
+  "license": "CC BY 4.0",
+  "rights_evidence": "Repository README and LICENSE explicitly state CC BY 4.0 for the dataset",
+  "validation_status": "validated",
+  "accessed_at_utc": "2026-10-02T20:39:53+00:00"
+}

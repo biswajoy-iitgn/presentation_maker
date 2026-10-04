@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.py[cod]
+
+# macOS
+.DS_Store
+
+# Logs and scratch
+*.log
+dataset_acquisition/tmp/
+
+# Downloaded third-party data: reproducible via the acquisition scripts and
+# tracked through the manifests, too large / not ours to redistribute
+consulting_corpus/files/
+consulting_corpus/previews/
+reference_reports/files/
+research_datasets/pptbench/raw_parquet/
+research_datasets/slideaudit/full_release/data/
