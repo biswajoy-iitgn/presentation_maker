@@ -20,8 +20,10 @@ def test_selector_never_returns_dual_axis_or_radar():
     best = choose("magnitude_and_rate_over_time", DataProfile(n_periods=4, n_measures=2, mixed_units=True))
     assert best[0].exhibit == "columns_over_line"
     assert next(c for c in best if c.exhibit == "dual_axis_combo").rejected
-    bench = choose("benchmark_vs_peers", DataProfile(n_categories=6, mixed_units=True, has_peer_distribution=True))
-    assert bench[0].exhibit == "range_benchmark"
+    profile = DataProfile(n_categories=6, mixed_units=True, has_peer_distribution=True)
+    bench = choose("benchmark_vs_peers", profile)
+    assert bench[0].exhibit == "gap_bars"                  # a board reads gap bars without decoding
+    assert choose("benchmark_vs_peers", profile, audience="analyst")[0].exhibit == "range_benchmark"
     assert all(c.rejected for c in bench if c.exhibit in ("radar", "ranked_bars"))
 
 
@@ -96,8 +98,12 @@ def test_example_brief_builds_clean(tmp_path):
     data = json.loads((EXAMPLE / "data.json").read_text())
     facts = mod.compute_facts(data)                         # reconciliation asserts run here
     assert facts["fy27_margin"] == "14.4%" and facts["kpis_worse"] == "five"
-    mod.main(tmp_path)
-    assert (tmp_path / "margin_recovery.pptx").exists()
-    report = (tmp_path / "plan_report.md").read_text()
-    assert "dual_axis_combo" in report and "(chosen)" in report
-    assert len(plan.slides) == 13
+    for family in ("meridian", "verdant"):
+        path, issues, lf, story = mod.main(tmp_path, family)
+        assert path.name == f"margin_recovery_{family}.pptx" and path.exists()
+        assert issues == [], issues                        # geometry and contrast lint clean in both families
+        assert lf.passed, [r.detail for r in lf.failures()]
+        assert story == []
+    report = (tmp_path / "margin_recovery_meridian_plan_report.md").read_text()
+    assert "dual_axis_combo" in report and "(chosen)" in report and "Look and feel gate" in report
+    assert len(plan.slides) == 14

@@ -13,6 +13,7 @@ from typing import Callable
 from pptx.enum.text import PP_ALIGN
 from pptx.util import Inches
 
+from deckforge.assets.treatment import luminance
 from deckforge.render import metrics
 from deckforge.render.canvas import Canvas
 from deckforge.viz import marks as M
@@ -31,6 +32,7 @@ class Point:
     size: float
     highlight: bool = False
     note: str = ""            # second label line, e.g. the size value
+    icon: str = ""            # icon drawn inside the bubble when it is large enough
 
 
 def _hit(a: Rect, b: Rect) -> bool:
@@ -58,7 +60,8 @@ def bubble_matrix(c: Canvas, box: Box, points: list[Point], *, x_title: str, y_t
                   domain_x: tuple[float, float] | None = None, domain_y: tuple[float, float] | None = None,
                   max_d=Inches(1.05), size_note: str = "", label_side: dict[str, str] | None = None) -> dict:
     """quadrants: {'tl','tr','bl','br': label}. shade: quadrant key tinted as the priority zone.
-    invert_y: low values at the top (when lower is better)."""
+    invert_y: low values at the top (when lower is better).
+    Returns {label: (cx, cy, d, (marker_x, marker_y))}: centre, diameter and a clear spot for a callout."""
     plot = Box(box.x + Inches(0.75), box.y + Inches(0.3), box.w - Inches(0.95), box.h - Inches(0.95))
     xs, ys = [p.x for p in points], [p.y for p in points]
     x0, x1 = domain_x or (min(xs), max(xs))
@@ -79,7 +82,7 @@ def bubble_matrix(c: Canvas, box: Box, points: list[Point], *, x_title: str, y_t
     for v in _ticks(x0, x1):
         M.centered_label(c, x(v), plot.b + Inches(0.06), fmt_x(v), w=Inches(0.8), size=S.TYPE.annotation,
                          color=S.MUTED, name=f"xt_{v:g}")
-    for v in _ticks(y0, y1):
+    for v in _ticks(y0, y1)[1:] if _ticks(x0, x1)[0] == x0 else _ticks(y0, y1):     # origin labelled once
         M.label(c, plot.x - Inches(0.75), y(v) - Inches(0.1), Inches(0.68), Inches(0.2), fmt_y(v),
                 size=S.TYPE.annotation, color=S.MUTED, align=PP_ALIGN.RIGHT, name=f"yt_{v:g}")
     M.label(c, plot.x, plot.b + Inches(0.32), plot.w, Inches(0.24), x_title, size=S.TYPE.unit, color=S.TEXT2,
@@ -107,13 +110,18 @@ def bubble_matrix(c: Canvas, box: Box, points: list[Point], *, x_title: str, y_t
             occupied.append(r)
 
     smax = max(p.size for p in points)
+    uniform = len({p.size for p in points}) == 1         # no size encoding: equal icon discs
     geo = []
     for p in points:
-        d = max(Inches(0.22), int(max_d * math.sqrt(p.size / smax)))
+        d = Inches(0.52) if uniform else max(Inches(0.22), int(max_d * math.sqrt(p.size / smax)))
         geo.append((p, x(p.x), y(p.y), d))
         occupied.append((int(x(p.x) - d / 2), int(y(p.y) - d / 2), d, d))
     for p, cx, cy, d in sorted(geo, key=lambda g: -g[3]):            # big first, small drawn on top
-        M.dot(c, cx, cy, d, S.ACCENT if p.highlight else S.NEUTRAL, ring="#FFFFFF", name=f"bubble_{p.label}")
+        fill = S.ACCENT if p.highlight else S.NEUTRAL
+        M.dot(c, cx, cy, d, fill, ring="#FFFFFF", name=f"bubble_{p.label}")
+        if p.icon and d >= Inches(0.42):
+            s_ = d * 0.48
+            M.icon(c, p.icon, cx - s_ / 2, cy - s_ / 2, s_, color=S.INK if luminance(fill) > 0.45 else "#FFFFFF")
 
     if quadrants:
         # each label takes the first corner of its quadrant that no bubble or label covers
@@ -136,33 +144,65 @@ def bubble_matrix(c: Canvas, box: Box, points: list[Point], *, x_title: str, y_t
                     align=PP_ALIGN.LEFT, name=f"quad_{key}")
             occupied.append(r)
 
+    # a label must not straddle a reference line: the line would read as a strike-through
+    lines_ = []
+    if x_ref:
+        lines_.append((int(x(x_ref[0])) - Inches(0.02), plot.y, Inches(0.04), plot.h))
+    if y_ref:
+        lines_.append((plot.x, int(y(y_ref[0])) - Inches(0.02), plot.w, Inches(0.04)))
     anchors = {}
     order = ["r", "l", "t", "b", "tr", "br", "tl", "bl"]
-    for p, cx, cy, d in sorted(geo, key=lambda g: -g[3]):
+
+    def crowding(g):            # the most boxed-in bubble picks its label spot first
+        return sum(math.hypot(g[1] - o[1], g[2] - o[2]) < Inches(1.3) for o in geo if o is not g)
+    for p, cx, cy, d in sorted(geo, key=lambda g: (-crowding(g), -g[3])):
         lw = max(_text_w(p.label, True), _text_w(p.note, False) if p.note else 0)
         lh = Inches(0.42 if p.note else 0.24)
         own = (int(cx - d / 2), int(cy - d / 2), d, d)
         prefs = [(label_side or {}).get(p.label, "r")] + order
         best, best_cost = None, None
-        for side in prefs:
-            r, al = _place(side, cx, cy, d, lw, lh)
-            inside = r[0] >= plot.x and r[0] + r[2] <= box.r and r[1] >= box.y + Inches(0.25) and r[1] + r[3] <= plot.b
-            cost = sum(_hit(r, o) for o in occupied if o != own) + (0 if inside else 5)
-            if best_cost is None or cost < best_cost:
-                best, best_cost = (r, al), cost
-            if cost == 0:
+        for reach in (0.0, 0.25, 0.5):             # next to the bubble first, then out on a short leader
+            for side in prefs:
+                r, al = _place(side, cx, cy, d, lw, lh, Inches(reach))
+                inside = (r[0] >= plot.x and r[0] + r[2] <= box.r and r[1] >= box.y + Inches(0.25)
+                          and r[1] + r[3] <= plot.b)
+                cost = sum(_hit(r, o) for o in occupied if o != own) + (0 if inside else 5)
+                cost += sum(_hit(r, ln) for ln in lines_) + reach * 1.5
+                if best_cost is None or cost < best_cost:
+                    best, best_cost = (r, al, reach), cost
+                if cost == 0:
+                    break
+            if best_cost < 1:
                 break
-        (r, al) = best
+        (r, al, reach) = best
+        if reach:
+            tx = min(max(cx, r[0]), r[0] + r[2])
+            ty = min(max(cy, r[1]), r[1] + r[3])
+            n = math.hypot(tx - cx, ty - cy) or 1
+            c.line(int(cx + (tx - cx) / n * d / 2), int(cy + (ty - cy) / n * d / 2), int(tx), int(ty), S.TEXT2, 0.75)
         lines = [[(p.label, True, S.INK)]] + ([[(p.note, False, S.TEXT2)]] if p.note else [])
         M.label(c, *r, lines, size=S.TYPE.label, align=al, name=f"bubble_label_{p.label}")
         occupied.append(r)
         anchors[p.label] = (int(cx), int(cy), d)
+
+    # callout marker spot per bubble: the first rim position clear of every label and other bubble
+    m = Inches(0.29)
+    for p, cx, cy, d in geo:
+        own = (int(cx - d / 2), int(cy - d / 2), d, d)
+        spots = []
+        for ang in (135, 45, 225, 315, 90, 180, 0, 270):
+            mx = cx + math.cos(math.radians(ang)) * d * 0.5
+            my = cy - math.sin(math.radians(ang)) * d * 0.5
+            rr = (int(mx - m / 2), int(my - m / 2), m, m)
+            spots.append((sum(_hit(rr, o) for o in occupied if o != own), int(mx), int(my)))
+        cost, mx, my = min(spots, key=lambda t: t[0])
+        anchors[p.label] = anchors[p.label] + ((mx, my),)
     return anchors
 
 
-def _place(side: str, cx, cy, d, lw, lh) -> tuple[Rect, object]:
+def _place(side: str, cx, cy, d, lw, lh, reach=0) -> tuple[Rect, object]:
     g = Inches(0.06)
-    half = d / 2
+    half = d / 2 + reach
     if side == "r":
         return (int(cx + half + g), int(cy - lh / 2), lw, lh), PP_ALIGN.LEFT
     if side == "l":

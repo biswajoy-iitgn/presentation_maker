@@ -7,7 +7,7 @@ from typing import Callable
 from pptx.enum.text import MSO_ANCHOR, PP_ALIGN
 from pptx.util import Inches
 
-from deckforge.assets.treatment import luminance
+from deckforge.assets.treatment import contrast_ratio, luminance
 from deckforge.render.canvas import Canvas
 from deckforge.viz import marks as M
 from deckforge.viz import style as S
@@ -16,7 +16,8 @@ from deckforge.viz.frame import Box
 
 def heat_table(c: Canvas, box: Box, rows: list[str], cols: list[str], values: list[list[float]], *,
                fmt: Callable[[float], str], row_head: str = "", total_label: str = "Total",
-               row_notes: list[str] | None = None, outline: set[tuple[int, int]] = frozenset()) -> dict:
+               row_notes: list[str] | None = None, outline: set[tuple[int, int]] = frozenset(),
+               row_icons: list[str] | None = None) -> dict:
     """outline: cells to frame in ink (the ones the title talks about)."""
     label_w = Inches(2.9)
     total_w = Inches(1.1)
@@ -44,8 +45,12 @@ def heat_table(c: Canvas, box: Box, rows: list[str], cols: list[str], values: li
     for i, (r, vals) in enumerate(zip(rows, values)):
         ry = y0 + row_h * i
         lines = [[(r, True, S.INK)]] + ([[(row_notes[i], False, S.MUTED)]] if row_notes else [])
-        M.label(c, box.x, ry, label_w - Inches(0.1), row_h, lines, size=S.TYPE.label, anchor=MSO_ANCHOR.MIDDLE,
-                name=f"heat_row_{i}")
+        lx = box.x
+        if row_icons:
+            M.icon_disc(c, row_icons[i], box.x + Inches(0.2), ry + row_h / 2, Inches(0.38))
+            lx += Inches(0.5)
+        M.label(c, lx, ry, label_w - Inches(0.1) - (lx - box.x), row_h, lines, size=S.TYPE.label,
+                anchor=MSO_ANCHOR.MIDDLE, name=f"heat_row_{i}")
         for j, v in enumerate(vals):
             cx = box.x + label_w + cell_w * j
             fill = bin_color(v)
@@ -53,7 +58,8 @@ def heat_table(c: Canvas, box: Box, rows: list[str], cols: list[str], values: li
             if (i, j) in outline:
                 c.rect(int(cx + M.GAP), int(ry + M.GAP), int(cell_w - 2 * M.GAP), int(row_h - 2 * M.GAP), None,
                        line=(S.INK, 2.0), register=False)
-            ink = "#FFFFFF" if luminance(fill) < 0.3 else S.INK
+            lf = luminance(fill)                      # whichever ink reads better on this step
+            ink = "#FFFFFF" if contrast_ratio(1.0, lf) >= contrast_ratio(luminance(S.INK), lf) else S.INK
             M.label(c, cx, ry, cell_w, row_h, fmt(v), size=S.TYPE.value, bold=(i, j) in outline, color=ink,
                     align=PP_ALIGN.CENTER, anchor=MSO_ANCHOR.MIDDLE, name=f"heat_val_{i}_{j}")
         M.label(c, tx, ry, total_w, row_h, fmt(sum(vals)), size=S.TYPE.value, bold=True, align=PP_ALIGN.CENTER,

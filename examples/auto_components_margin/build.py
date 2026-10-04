@@ -11,6 +11,7 @@ import re
 import sys
 from pathlib import Path
 
+from deckforge.qa import consistency, lookfeel
 from deckforge.qa.repair import lint_and_repair
 from deckforge.story.plan import Plan
 from deckforge.story.render import render, report
@@ -61,6 +62,7 @@ def compute_facts(d: dict) -> dict:
     kpis = d["cost_benchmark"]["kpis"]
     worse = [k for k in kpis if (k["ours"] < k["median"]) == k["higher_is_better"] and k["ours"] != k["median"]]
     f["kpis_worse"] = WORDS[len(worse)]
+    f["kpis_worse_n"] = f"{len(worse)} of {len(kpis)}"
     conv = next(k for k in kpis if k["name"] == "Conversion cost")
     f["conv_gap_pct"] = fmt_num(-(conv["ours"] - conv["median"]) / conv["median"] * 100, 0, suffix="%", sign=True)
 
@@ -97,8 +99,8 @@ def compute_facts(d: dict) -> dict:
 
     lev = {p["label"]: p for p in d["levers"]["points"]}
     assert sum(p["y"] for p in lev.values()) == ops + commercial, "lever values must equal the prize"
-    qw = [p for p in lev.values() if p["x"] > d["levers"]["x_ref"][0] and p["y"] > d["levers"]["y_ref"][0]]
-    f["quick_win_value"] = fmt_inr_cr(sum(p["y"] for p in qw))
+    f["oee_pm_value"] = fmt_inr_cr(lev["OEE uplift"]["y"] + lev["Price and mix"]["y"])
+    f["pune_chakan_value"] = fmt_inr_cr(pune_chakan)
 
     walk = d["margin_walk"]
     wl = levels([Step(s["label"], s.get("value"), s.get("kind", "delta")) for s in walk["steps"]])
@@ -107,7 +109,7 @@ def compute_facts(d: dict) -> dict:
     f["target_gap_bps"] = round((walk["benchmark"][0] - fy27) * 100)
     f["fy27_revenue"] = fmt_num(walk["fy27_revenue"], 0)
     by = {s["label"]: s["value"] for s in walk["steps"]}
-    f["walk_contracts_oee_bps"] = round((by["Raw-material index clauses"] + by["OEE uplift"]) * 100)
+    f["pm_bps"] = round(by["Price and mix"] * 100)
     for s in walk["steps"][2:-1]:           # lever bps must equal lever value over FY27 revenue
         assert abs(s["value"] - lev[s["label"]]["y"] / walk["fy27_revenue"] * 100) < 0.01, s["label"]
 
@@ -127,23 +129,32 @@ def _value(note: str) -> float:
     return float(m.group(1)) if m else 0.0
 
 
-def main(out_dir: Path):
+def main(out_dir: Path, family: str | None = None):
     plan = Plan.model_validate_json((HERE / "plan.json").read_text())
     data = json.loads((HERE / "data.json").read_text())
     facts = compute_facts(data)
     brief_numbers = set(re.findall(r"\d[\d,.]*", (HERE / "brief.md").read_text()))
-    deck, decisions = render(plan, data, facts, allowed_numbers=brief_numbers)
+    deck, decisions = render(plan, data, facts, allowed_numbers=brief_numbers, family=family)
     actions, issues = lint_and_repair(deck)
+    lf = lookfeel.check(deck, decisions, audience=plan.audience)
+    story = consistency.matrix_vs_roadmap(data["levers"], data["roadmap"])
     out_dir.mkdir(parents=True, exist_ok=True)
-    path = deck.save(out_dir / "margin_recovery.pptx")
-    (out_dir / "plan_report.md").write_text(report(plan, decisions, facts))
+    name = f"margin_recovery_{family or plan.family}"
+    path = deck.save(out_dir / f"{name}.pptx")
+    (out_dir / f"{name}_plan_report.md").write_text(report(plan, decisions, facts, lf, story))
     (out_dir / "facts.json").write_text(json.dumps(facts, indent=1, ensure_ascii=False))
     print(path)
     print("repairs:", actions or "none")
     print("lint:", "clean" if not issues else "\n  " + "\n  ".join(map(str, issues)))
+    print("look and feel:", "pass" if lf.passed else "FAIL")
+    for r in lf.failures():
+        print(f"  [{r.code}] {r.detail}")
+    print("storyline:", "consistent" if not story else "\n  " + "\n  ".join(story))
     warn = [(d.slide, d.title_warnings) for d in decisions if d.title_warnings]
     print("typed numbers in titles:", warn or "none")
+    return path, issues, lf, story
 
 
 if __name__ == "__main__":
-    main(Path(sys.argv[1]) if len(sys.argv) > 1 else Path("out/margin_recovery"))
+    out = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("out/margin_recovery")
+    main(out, sys.argv[2] if len(sys.argv) > 2 else None)

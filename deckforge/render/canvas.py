@@ -13,7 +13,7 @@ from pptx.dml.color import RGBColor
 from pptx.enum.shapes import MSO_CONNECTOR, MSO_SHAPE
 from pptx.enum.text import MSO_ANCHOR, PP_ALIGN
 from pptx.oxml.ns import qn
-from pptx.util import Emu, Inches, Pt
+from pptx.util import Inches, Pt
 
 from deckforge.render import metrics
 from deckforge.tokens import Theme
@@ -68,10 +68,15 @@ class Canvas:
         paras = content if isinstance(content, list) else [content]
         plain = "\n".join(p if isinstance(p, str) else "".join(r[0] for r in p) for p in paras)
         any_bold = bold or any(not isinstance(p, str) and any(r[1] for r in p) for p in paras)
+        runs_all = [r for p in paras if not isinstance(p, str) for r in p]
+        # legibility is judged on the colour carrying most of the text
+        lint_color = color
+        if runs_all and all(len(r) > 2 for r in runs_all):
+            lint_color = max(runs_all, key=lambda r: len(r[0]))[2]
         used = metrics.text_height(plain, font, size, any_bold, w)
         tb = self.slide.shapes.add_textbox(x, y, w, h)
         self.placed.append(Placed("text", name or plain[:40], (x, y, w, used if anchor == MSO_ANCHOR.TOP else h),
-                                  color, size, any_bold, shape=tb))
+                                  lint_color, size, any_bold, shape=tb))
         tf = tb.text_frame
         tf.word_wrap = True
         tf.auto_size = None

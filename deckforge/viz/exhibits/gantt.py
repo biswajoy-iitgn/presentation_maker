@@ -25,8 +25,10 @@ class Task:
 
 
 def roadmap(c: Canvas, box: Box, tasks: list[Task], waves: list[str], *, months: int = 24, tick: int = 3,
-            milestones: list[tuple[float, str]] = ()) -> dict:
-    label_w, note_w = Inches(3.1), Inches(1.0)
+            milestones: list[tuple[float, str]] = (), wave_icons: list[str] | None = None) -> dict:
+    widest = max([M.text_w(t.name, S.TYPE.label) + Inches(0.4) for t in tasks] +
+                 [M.text_w(w, S.TYPE.label, True) + Inches(0.5) for w in waves])
+    label_w, note_w = max(Inches(2.6), min(Inches(3.9), widest)), Inches(1.0)       # labels on one line
     lane_h = Inches(0.62) if milestones else 0
     axis_h = Inches(0.3)
     x = Linear(0, months, box.x + label_w, box.r - note_w - Inches(0.1))
@@ -40,7 +42,7 @@ def roadmap(c: Canvas, box: Box, tasks: list[Task], waves: list[str], *, months:
         M.centered_label(c, x(m), box.y + lane_h, f"M{m}", w=Inches(0.6), size=S.TYPE.annotation, color=S.MUTED,
                          name=f"month_{m}")
     for m, text in milestones:
-        sp = c.rect(int(x(m) - Inches(0.08)), int(box.y + lane_h - Inches(0.22)), int(Inches(0.16)),
+        c.rect(int(x(m) - Inches(0.08)), int(box.y + lane_h - Inches(0.22)), int(Inches(0.16)),
                     int(Inches(0.16)), S.INK, shape=MSO_SHAPE.DIAMOND, register=False, name=f"milestone_{m}")
         M.centered_label(c, x(m), box.y, text, w=Inches(1.7), h=Inches(0.36), size=S.TYPE.annotation, bold=True,
                          name=f"milestone_label_{m}")
@@ -48,9 +50,12 @@ def roadmap(c: Canvas, box: Box, tasks: list[Task], waves: list[str], *, months:
     y = top
     for w_i, wave in enumerate(waves):
         M.bar(c, box.x, y + Inches(0.04), box.w, row_h - Inches(0.08), S.PANEL, name=f"wave_band_{w_i}")
-        M.bar(c, box.x + Inches(0.1), y + row_h / 2 - Inches(0.06), Inches(0.12), Inches(0.12), S.WAVES[w_i],
-              register=False)
-        M.label(c, box.x + Inches(0.3), y, label_w, row_h, wave, size=S.TYPE.label, bold=True, color=S.INK,
+        if wave_icons:
+            M.icon_disc(c, wave_icons[w_i], box.x + Inches(0.17), y + row_h / 2, row_h * 0.82, fill=S.WAVES[w_i])
+        else:
+            M.bar(c, box.x + Inches(0.1), y + row_h / 2 - Inches(0.06), Inches(0.12), Inches(0.12), S.WAVES[w_i],
+                  register=False)
+        M.label(c, box.x + Inches(0.4), y, label_w, row_h, wave, size=S.TYPE.label, bold=True, color=S.INK,
                 anchor=MSO_ANCHOR.MIDDLE, name=f"wave_{w_i}")
         y += row_h
         for t in (t for t in tasks if t.wave == w_i):

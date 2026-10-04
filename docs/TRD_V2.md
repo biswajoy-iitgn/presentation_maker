@@ -497,6 +497,8 @@ This is the subsystem that enforces top-consulting quality. Each gate is a layer
 | QA-7 Consulting-grade preference | Slide, deck | Overall "would a top-firm engagement manager accept this slide" | Prompted pairwise VLM judge against retrieved exemplars | Pairwise reward model on render plus spec | No (ranks variants, flags low scorers) |
 | QA-8 Data status | Deck | Remaining dummy data | Deterministic | Deterministic | Yes (final only) |
 | QA-9 Assets | Slide | Relevance, aesthetics, technical quality, no text or watermark, no faces unless requested, legibility contrast, palette fit, duplicates (7.9) | Deterministic checks plus pretrained scorers | Same, thresholds calibrated on corpus imagery | Legibility and licence metadata only |
+| QA-10 Look and feel | Deck | Imagery or graphics on at least 70% of slides, cover imagery, at least 6 distinct layouts, no layout repeated more than twice in a row, a focal element on every content slide, word limits, minimum font 9.5 pt, chart forms the audience reads without decoding. Thresholds from the corpus decks (`deckforge/qa/lookfeel.py`) | Deterministic on the object model | Discriminator (corpus vs generated) replaces fixed thresholds (11.4) | Yes |
+| QA-11 Storyline consistency | Deck | Exhibits must not contradict each other: a matrix quick win must start in the first roadmap wave, a major project must not; numbers quoted in cards match the walk and the value table (`deckforge/qa/consistency.py`, build-time reconciliation asserts) | Deterministic on exhibit data | Same, plus LLM claim cross-check across slides | Yes |
 
 ### 10.2 Training recipes
 

@@ -25,9 +25,10 @@ class Segment:
 
 def profit_pool(c: Canvas, box: Box, segments: list[Segment], *, highlight: set[str],
                 fmt_rate: Callable[[float], str], fmt_profit: Callable[[float], str],
-                average: tuple[float, str] | None = None, x_title: str = "", y_title: str = "") -> dict:
+                average: tuple[float, str] | None = None, x_title: str = "", y_title: str = "",
+                icons: dict[str, str] | None = None) -> dict:
     total = sum(s.size for s in segments)
-    label_h = Inches(0.75)
+    label_h = Inches(1.15 if icons else 0.75)
     plot = Box(box.x + Inches(0.55), box.y + Inches(0.45), box.w - Inches(0.75), box.h - Inches(0.45) - label_h)
     x = Linear(0, total, plot.x, plot.r)
     hi = max(s.rate for s in segments) * 1.18
@@ -48,8 +49,12 @@ def profit_pool(c: Canvas, box: Box, segments: list[Segment], *, highlight: set[
             M.centered_label(c, cx, plot.b - Inches(0.34), fmt_profit(profit), w=int(x1 - x0), size=S.TYPE.label,
                              bold=True, color="#FFFFFF" if hot else S.INK, name=f"pool_profit_{i}")
         share = f"{s.size / total * 100:.0f}%"
+        ty = plot.b + Inches(0.08)
+        if icons and s.name in icons:
+            M.icon_disc(c, icons[s.name], cx, ty + Inches(0.2), Inches(0.4), fill=S.ACCENT if hot else S.NEUTRAL)
+            ty += Inches(0.46)
         lines = metrics.wrap(s.name, S.FONT, S.TYPE.label, True, int(x1 - x0 - Inches(0.05)))
-        M.centered_label(c, cx, plot.b + Inches(0.08), [[(ln, True, S.INK)] for ln in lines] + [[(share, False, S.TEXT2)]],
+        M.centered_label(c, cx, ty, [[(ln, True, S.INK)] for ln in lines] + [[(share, False, S.TEXT2)]],
                          w=int(x1 - x0), h=label_h, size=S.TYPE.label, name=f"pool_name_{i}")
         anchors[s.name] = (int(x1), int(y(s.rate)))
     M.hline(c, plot.x, plot.r, plot.b, S.INK, 0.75)

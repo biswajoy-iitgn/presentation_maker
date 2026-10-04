@@ -41,15 +41,21 @@ class Analysis(BaseModel):
 
 
 class Point(BaseModel):
-    """A commentary point, optionally anchored to an exhibit element by a numbered marker."""
+    """A commentary point, optionally anchored to an exhibit element by a numbered marker, or led by an icon."""
     lead: str
     text: str
     target: str | int | None = None
+    icon: str | None = None
+
+
+class Kpi(BaseModel):
+    value: str
+    caption: str
 
 
 class Slide(BaseModel):
     id: str
-    archetype: Literal["cover", "exec_summary", "exhibit", "decisions"]
+    archetype: Literal["cover", "agenda", "exec_summary", "exhibit", "decisions"]
     title: str
     subtitle: str | None = None
     section: int | None = None
@@ -61,6 +67,8 @@ class Slide(BaseModel):
     commentary_head: str | None = None
     points: list[Point] = Field(default_factory=list)
     rows: list[dict] = Field(default_factory=list)      # exec summary and decision rows
+    kpis: list[Kpi] = Field(default_factory=list)       # big-number sidebar instead of commentary
+    header: Literal["auto", "rule", "band"] = "auto"
     sticker: str | None = None
     source: str = ""
     notes: list[str] = Field(default_factory=list)
@@ -69,6 +77,8 @@ class Slide(BaseModel):
 class Plan(BaseModel):
     brief_id: str
     produced_by: str
+    audience: str = "board"
+    family: str = "meridian"
     problem: Problem
     issue_tree: Issue
     governing_thought: str

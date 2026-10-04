@@ -205,6 +205,12 @@
    ]
   },
   {
+   "id": "S01b",
+   "archetype": "agenda",
+   "title": "Restoring EBITDA margin to 15%",
+   "section": 0
+  },
+  {
    "id": "S02",
    "archetype": "exec_summary",
    "title": "Margin can recover to {fy27_margin} within 24 months through seven levers, and reach 15% with a portfolio decision",
@@ -213,22 +219,38 @@
     {
      "label": "Diagnosis",
      "lead": "Margin fell {margin_drop_bps} bps in three years",
-     "text": "while revenue grew {revenue_growth_pct}. Raw-material pass-through lag and a mix shift to machined components explain {bridge_top2_bps} bps of the decline."
+     "text": "while revenue grew {revenue_growth_pct}. Raw-material pass-through lag and a mix shift to machined components explain {bridge_top2_bps} bps of the decline.",
+     "icon": "search",
+     "kpi": "{margin_drop_bps_signed} bps",
+     "kpi_caption": "EBITDA margin since FY22",
+     "kpi_bad": true
     },
     {
      "label": "Benchmark",
      "lead": "We trail the peer median on {kpis_worse} of six cost drivers,",
-     "text": "most on conversion cost ({conv_gap_pct} against median) and OEE. Pune and Chakan account for {plant_gap_share} of the conversion-cost gap."
+     "text": "most on conversion cost ({conv_gap_pct} against median) and OEE. Pune and Chakan account for {plant_gap_share} of the conversion-cost gap.",
+     "icon": "scale",
+     "kpi": "{kpis_worse_n}",
+     "kpi_caption": "cost drivers below the peer median",
+     "kpi_bad": true
     },
     {
      "label": "Potential",
      "lead": "{value_at_stake} of annual EBITDA is at stake",
-     "text": "across seven levers: {ops_value} in plant operations, {pune_chakan_share} of it at Pune and Chakan, and {commercial_value} in contracts, price and mix."
+     "text": "across seven levers: {ops_value} in plant operations, {pune_chakan_share} of it at Pune and Chakan, and {commercial_value} in contracts, price and mix.",
+     "icon": "coins",
+     "kpi": "{value_at_stake}",
+     "kpi_caption": "annual EBITDA at stake",
+     "kpi_bad": false
     },
     {
      "label": "Plan",
      "lead": "Three waves lift margin to {fy27_margin} by FY27.",
-     "text": "Closing the last {target_gap_bps} bps to 15% requires a decision on the machined-components portfolio."
+     "text": "Closing the last {target_gap_bps} bps to 15% requires a decision on the machined-components portfolio.",
+     "icon": "route",
+     "kpi": "{fy27_margin}",
+     "kpi_caption": "EBITDA margin by FY27",
+     "kpi_bad": false
     }
    ]
   },
@@ -241,21 +263,21 @@
    "exhibit_title": "Revenue and EBITDA margin, FY22 to FY25",
    "sticker": "ILLUSTRATIVE",
    "source": "Source: company financials FY22 to FY25; plant MIS; DeckForge analysis",
-   "commentary_head": "What happened",
-   "points": [
+   "commentary_head": null,
+   "points": [],
+   "header": "band",
+   "kpis": [
     {
-     "lead": "Volume-led growth",
-     "text": "from new EV and export programmes, while annual OEM price-downs eroded realisation.",
-     "target": "col:3"
+     "value": "+{revenue_growth_pct}",
+     "caption": "revenue growth, FY22 to FY25"
     },
     {
-     "lead": "The steepest fall came in FY23,",
-     "text": "when steel prices rose and contracts had no index clauses to pass them on.",
-     "target": "line:1"
+     "value": "{margin_drop_bps_signed} bps",
+     "caption": "EBITDA margin over the same period"
     },
     {
-     "lead": "Scale did not protect margin:",
-     "text": "fixed-cost absorption improved, but less than input costs and mix worsened."
+     "value": "{revenue_cagr}",
+     "caption": "revenue growth a year, volume-led"
     }
    ]
   },
@@ -305,20 +327,20 @@
    ],
    "sticker": "ILLUSTRATIVE",
    "source": "Source: company financials FY22 to FY25; plant MIS; DeckForge analysis",
-   "commentary_head": "Implications",
-   "points": [
+   "commentary_head": null,
+   "points": [],
+   "kpis": [
     {
-     "lead": "Machined components earn {machined_ebitda}",
-     "text": "on {machined_revenue} of revenue, the largest revenue line after forgings but the smallest profit pool per rupee.",
-     "target": "Machined components"
+     "value": "{machined_margin}",
+     "caption": "EBITDA margin on machined components"
     },
     {
-     "lead": "Every point of mix",
-     "text": "moved from forgings to machining costs about {mix_cost_per_pp} bps of company margin."
+     "value": "{machined_share_fy25}",
+     "caption": "of revenue, up from {machined_share_fy22} in FY22"
     },
     {
-     "lead": "Fix, reprice or exit:",
-     "text": "the portfolio question the board needs to answer."
+     "value": "{mix_cost_per_pp} bps",
+     "caption": "of company margin lost per point of mix shift"
     }
    ]
   },
@@ -328,9 +350,11 @@
    "section": 1,
    "analysis": "A4",
    "title": "We trail the peer median on {kpis_worse} of six cost drivers, most on conversion cost and OEE",
-   "exhibit_title": "Cost drivers against eight listed peers, FY25",
+   "exhibit_title": "Cost drivers against the median of eight listed peers, FY25",
    "sticker": "ILLUSTRATIVE",
-   "source": "Source: peer annual reports FY25; company data; DeckForge analysis"
+   "source": "Source: peer annual reports FY25; company data; DeckForge analysis",
+   "header": "band",
+   "exhibit": "auto"
   },
   {
    "id": "S07",
@@ -338,7 +362,7 @@
    "section": 1,
    "analysis": "A5",
    "title": "Pune and Chakan account for {plant_gap_share} of the conversion-cost gap to the peer median",
-   "exhibit_title": "Plant performance, FY25",
+   "exhibit_title": "Plant locations and conversion-cost gap, FY25",
    "emphasis": [
     "Pune",
     "Chakan"
@@ -350,17 +374,17 @@
     {
      "lead": "Pune:",
      "text": "{pune_gap} a year above peer-median cost, on the lowest OEE in the network.",
-     "target": "Pune"
+     "icon": "factory"
     },
     {
      "lead": "Chakan:",
-     "text": "{chakan_gap} a year, similar loss pattern at smaller scale.",
-     "target": "Chakan"
+     "text": "{chakan_gap} a year, the same loss pattern at smaller scale.",
+     "icon": "factory"
     },
     {
      "lead": "Sanand shows it can be done:",
-     "text": "already better than the peer median on both measures.",
-     "target": "Sanand"
+     "text": "already better than the peer median on cost and OEE.",
+     "icon": "circle-check"
     }
    ]
   },
@@ -394,7 +418,8 @@
      "lead": "Target:",
      "text": "recover two thirds of these losses within a year."
     }
-   ]
+   ],
+   "header": "band"
   },
   {
    "id": "S09",
@@ -409,19 +434,20 @@
    "notes": [
     "Note: commercial levers (raw-material index clauses {rm_value}, price and mix {pm_value}) are company-wide and shown on the next page"
    ],
-   "commentary_head": "Reading the map",
-   "points": [
+   "commentary_head": null,
+   "points": [],
+   "kpis": [
     {
-     "lead": "OEE is the largest lever,",
-     "text": "{oee_value} a year, and two thirds of it sits in two plants."
+     "value": "{pune_chakan_share}",
+     "caption": "of plant value sits at Pune and Chakan"
     },
     {
-     "lead": "Smaller plants",
-     "text": "carry little value: roll out the playbook, not a full programme."
+     "value": "{oee_value}",
+     "caption": "from OEE uplift, the largest single lever"
     },
     {
-     "lead": "Commercial levers add {commercial_value},",
-     "text": "bringing the total prize to {value_at_stake}."
+     "value": "{value_at_stake}",
+     "caption": "total prize including {commercial_value} of commercial levers"
     }
    ]
   },
@@ -430,11 +456,10 @@
    "archetype": "exhibit",
    "section": 3,
    "analysis": "A8",
-   "title": "Index clauses and OEE are the quick wins, together {quick_win_value} of the {value_at_stake} prize",
+   "title": "Index clauses are the only large quick win, OEE and price-mix add {oee_pm_value} but need full programmes",
    "exhibit_title": "Lever prioritisation",
    "emphasis": [
-    "Raw-material index clauses",
-    "OEE uplift"
+    "Raw-material index clauses"
    ],
    "sticker": "ILLUSTRATIVE",
    "source": "Source: operations and commercial team estimates; DeckForge analysis",
@@ -442,19 +467,26 @@
    "points": [
     {
      "lead": "Start with contracts:",
-     "text": "index clauses need no capex and protect every future steel cycle.",
+     "text": "no capex, and they protect every future steel cycle.",
      "target": "Raw-material index clauses"
     },
     {
+     "lead": "OEE needs a plant programme:",
+     "text": "{programme_capex} of capex, so it leads the second wave.",
+     "target": "OEE uplift"
+    },
+    {
      "lead": "Price and mix is large but hard:",
-     "text": "it touches OEM relationships and needs the portfolio decision first.",
+     "text": "it needs the portfolio decision first.",
      "target": "Price and mix"
     },
     {
-     "lead": "Bundle the fill-ins",
-     "text": "(energy, spares, yield) into the plant programmes."
+     "lead": "Fill-ins ride along:",
+     "text": "energy and spares in the first wave, yield with the plants.",
+     "icon": "layers"
     }
-   ]
+   ],
+   "header": "band"
   },
   {
    "id": "S11",
@@ -473,18 +505,9 @@
    "notes": [
     "Note: FY27 revenue assumed at ₹{fy27_revenue} crore; lever values at full run-rate"
    ],
-   "commentary_head": "Closing the gap",
-   "points": [
-    {
-     "lead": "Contracts and OEE",
-     "text": "deliver {walk_contracts_oee_bps} bps between them, more than half of the uplift.",
-     "target": 4
-    },
-    {
-     "lead": "The last {target_gap_bps} bps",
-     "text": "depends on fixing or exiting the lowest-margin machined SKUs."
-    }
-   ]
+   "commentary_head": null,
+   "points": [],
+   "kpis": []
   },
   {
    "id": "S12",
@@ -509,23 +532,34 @@
      "lead": "Raw-material index clauses",
      "text": "as a required term in the top ten OEM contracts at the next renewal.",
      "owner": "CEO and CFO",
-     "when": "From Q4 FY26"
+     "when": "From Q4 FY26",
+     "icon": "handshake",
+     "kpi": "{rm_value}",
+     "kpi_caption": "EBITDA a year, no capex"
     },
     {
      "label": "Fund",
-     "lead": "The Pune and Chakan turnaround,",
+     "lead": "The Pune and Chakan turnaround",
      "text": "{programme_capex} of capex plus a dedicated transformation office for {tmo_months} months.",
      "owner": "COO",
-     "when": "Start M0"
+     "when": "Start M0",
+     "icon": "banknote",
+     "kpi": "{pune_chakan_value}",
+     "kpi_caption": "EBITDA a year from all operating levers at the two plants"
     },
     {
      "label": "Commission",
      "lead": "A portfolio review of machined components",
-     "text": "to fix, reprice or exit by month 9, worth about {target_gap_bps} bps of margin.",
+     "text": "to fix, reprice or exit by month 9. It decides whether 15% is reachable.",
      "owner": "CEO, Strategy",
-     "when": "Decision by M9"
+     "when": "Decision by M9",
+     "icon": "search",
+     "kpi": "{pm_value}",
+     "kpi_caption": "EBITDA a year from price and mix, plus the last {target_gap_bps} bps to 15%"
     }
    ]
   }
- ]
+ ],
+ "family": "meridian",
+ "audience": "board"
 }

@@ -58,7 +58,8 @@ def levels(steps: list[Step]) -> list[tuple[float, float]]:
 def waterfall(c: Canvas, box: Box, steps: list[Step], *, fmt_total: Callable[[float], str],
               fmt_delta: Callable[[float], str], higher_is_better: bool = True, floor: float | None = None,
               brackets: list[tuple[int, int, str]] = (), benchmark: tuple[float, str] | None = None,
-              bar_frac: float = 0.62, emphasis: set[int] | None = None) -> dict[int, "BarAnchor"]:
+              bar_frac: float = 0.62, emphasis: set[int] | None = None,
+              icons: dict[int, str] | None = None) -> dict[int, "BarAnchor"]:
     """Returns {index: BarAnchor} for callouts.
 
     floor: start the value axis here and mark totals with an axis break (keeps small deltas readable).
@@ -73,7 +74,8 @@ def waterfall(c: Canvas, box: Box, steps: list[Step], *, fmt_total: Callable[[fl
     cat_size = _fit_category_size([s.label for s in steps], int(box.w / n - Inches(0.08)))
     n_lines = max(len(metrics.wrap(s.label, S.FONT, cat_size, s.kind == "total", int(box.w / n - Inches(0.08))))
                   for s in steps)
-    label_h = Inches(0.12) + int(n_lines * cat_size * 1.2 * 12700)
+    icon_h = Inches(0.42) if icons else 0
+    label_h = Inches(0.12) + int(n_lines * cat_size * 1.2 * 12700) + icon_h
     top_pad = Inches(0.45) + Inches(0.38) * (max((lvl for *_, lvl in _bracket_levels(brackets)), default=-1) + 1)
     plot = Box(box.x, box.y + top_pad, box.w, box.h - top_pad - label_h)
     y = Linear(lo, hi, plot.b, plot.y)
@@ -111,7 +113,11 @@ def waterfall(c: Canvas, box: Box, steps: list[Step], *, fmt_total: Callable[[fl
                              bold=True, color=_label_color(s, color), knockout=knock, name=f"wf_val_{i}")
         # category label, wrapped to the slot
         lines = metrics.wrap(s.label, S.FONT, cat_size, s.kind == "total", int(slot - Inches(0.08)))
-        M.centered_label(c, cx, plot.b + Inches(0.08), lines, w=int(slot - Inches(0.04)),
+        if icons and i in icons:
+            hot = emphasis is None or i in emphasis
+            M.icon(c, icons[i], cx - Inches(0.16), plot.b + Inches(0.1), Inches(0.32),
+                   color=(S.NEGATIVE if (s.value or 0) < 0 else S.ACCENT) if hot and s.kind != "total" else S.MUTED)
+        M.centered_label(c, cx, plot.b + Inches(0.08) + icon_h, lines, w=int(slot - Inches(0.04)),
                          h=label_h, size=cat_size, color=S.TEXT2, bold=s.kind == "total", name=f"wf_cat_{i}")
         if i < n - 1:
             level = t if s.kind == "total" else b + s.value

@@ -42,6 +42,7 @@ class DataProfile:
     rows: int = 0
     cols: int = 0
     has_dates: bool = False
+    has_geo: bool = False
 
 
 @dataclass
@@ -103,10 +104,15 @@ def _rules(m: MessageType, p: DataProfile) -> list[Candidate]:
                      ["rejected: one axis cannot hold mixed units" if p.mixed_units else
                       "single KPI ranked against named peers"]))
         out.append(C("radar", 0.0, ["rejected: angles and areas distort comparison, order changes the shape"]))
+        out.append(C("gap_bars", 0.88, ["every KPI reduced to one signed % gap to the peer median, worst first",
+                                         "our value and the median stay visible as columns"]))
     if m == "ranking":
         out.append(C("ranked_bars", 0.9, ["sorted horizontal bars, long labels stay horizontal"]))
 
     # two measures
+    if m == "portfolio" and p.has_geo:
+        out.append(C("site_map", 0.9, ["units have locations: a map shows where, a ranked bar shows how much",
+                                       "avoids a two-axis scatter the reader has to decode"]))
     if m == "portfolio":
         out.append(C("bubble_matrix", 0.92 if p.has_size else 0.0,
                      ["two performance measures on the axes, scale as bubble area",
@@ -132,9 +138,29 @@ def _rules(m: MessageType, p: DataProfile) -> list[Candidate]:
     return out
 
 
-def choose(message: MessageType, profile: DataProfile) -> list[Candidate]:
-    """All candidates, best first. The first non-rejected candidate is the choice."""
-    ranked = sorted(_rules(message, profile), key=lambda c: -c.score)
+# How quickly a non-specialist reader decodes each form. Boards get the familiar form when fit is close.
+FAMILIARITY = {
+    "columns": 0.08, "line": 0.08, "ranked_bars": 0.08, "kpi_row": 0.08, "gap_bars": 0.07, "waterfall": 0.06,
+    "columns_over_line": 0.06, "roadmap": 0.06, "site_map": 0.06, "stacked_100": 0.04, "heat_table": 0.04,
+    "priority_matrix": 0.03, "scatter": 0.0, "profit_pool": -0.02, "bubble_matrix": -0.03, "indexed_lines": -0.03,
+    "range_benchmark": -0.06,
+}
+
+
+def choose(message: MessageType, profile: DataProfile, audience: str = "board") -> list[Candidate]:
+    """All candidates, best first. The first non-rejected candidate is the choice.
+
+    For board and executive audiences, familiarity breaks near-ties toward forms read without decoding.
+    """
+    cands = _rules(message, profile)
+    if audience in ("board", "executive"):
+        for cd in cands:
+            if cd.score > 0:
+                bonus = FAMILIARITY.get(cd.exhibit, 0.0)
+                cd.score = round(cd.score + bonus, 3)
+                if bonus:
+                    cd.reasons.append(f"familiarity for a {audience} audience {bonus:+.2f}")
+    ranked = sorted(cands, key=lambda c: -c.score)
     if not ranked or ranked[0].rejected:
         raise ValueError(f"no admissible exhibit for message '{message}'")
     return ranked
@@ -164,6 +190,7 @@ def profile_of(exhibit_data: dict) -> DataProfile:
     if "points" in exhibit_data:
         p.n_categories = len(exhibit_data["points"])
         p.has_size = all("size" in x for x in exhibit_data["points"])
+        p.has_geo = all("lat" in x and "lon" in x for x in exhibit_data["points"])
     if "values" in exhibit_data:
         p.rows, p.cols = len(exhibit_data["values"]), len(exhibit_data["values"][0])
     if "tasks" in exhibit_data:
