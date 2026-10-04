@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Status | Draft V2.1, 2026-10-04. Supersedes `Presentation_Maker_PRD_V1.md` |
+| Status | Draft V2.2, 2026-10-04. Supersedes `Presentation_Maker_PRD_V1.md` |
 | Companion docs | `docs/TRD_V2.md` (technical design), `docs/BUILD_PLAN.md` (milestones), `docs/PRD_V1_review_and_open_questions.md` (rationale for changes) |
 | Codename | DeckForge (placeholder) |
 
@@ -26,6 +26,9 @@
 | D10 | Visual output must be designed, not generic. Charts, graphics and typography are produced by DeckForge's own rendering engine as native PowerPoint objects to top-firm craft. No image-based charts, no library-default styling |
 | D11 | The system must know consulting frameworks and analyses, and choose the analysis and visual from the business question (`docs/FRAMEWORK_LIBRARY.md`) |
 | D12 | Multiple style families are supported. Default is consulting style (section 6) |
+| D13 | No hiring. All learning is self-supervised: corpus, synthetic data with exact labels, verifiable checks, public labelled datasets (TRD 11.4) |
+| D14 | The models generate or fetch imagery (backgrounds, photos, abstract art) so decks match the visual standard of the samples (TRD 7.9) |
+| D15 | Claude Code builds the product. The founder provides decisions, compute, corpus access, network allow-listing and a one-hour review per milestone |
 
 ### 0.2 Working assumptions (change if wrong)
 
@@ -36,7 +39,7 @@
 | A3 | English only for v1 | Multilingual adds tokenisation, typography and QA work |
 | A4 | 16:9 slides, 10 to 40 slides per deck | Long decks (60+) need chapter-level parallelism |
 | A5 | think-cell is not required. Native PowerPoint charts are the default. A think-cell adapter is optional later | think-cell automation needs Windows with PowerPoint and think-cell installed on the server |
-| A6 | Team of about 5 FTE plus part-time ex-consultant annotators and IP counsel | Timeline in `BUILD_PLAN.md` scales with this |
+| A6 | Builder is Claude Code (D15). No annotators. IP counsel optional before GA | Model work is gated by GPU access, not engineering hours |
 
 ### 0.3 Open items (need founder input)
 
@@ -126,7 +129,8 @@ Priority: **M** = MVP (pilot), **V1.1** = after pilot, **L** = later.
 | FR-V4 | Frameworks and diagrams: process chevrons, issue trees, pillars, timelines, org charts, value chains, as editable grouped shapes | M |
 | FR-V5 | Icons from a licensed, customer-replaceable icon set | V1.1 |
 | FR-V6 | Message emphasis in charts: highlight colour on the data that proves the title, everything else neutral | M |
-| FR-V7 | AI-generated imagery, animations | L |
+| FR-V7 | Animations | L |
+| FR-V14 | Imagery by role (cover, divider, header band, side panel, message-panel photo, backdrop): procedural generation, local open-weight text-to-image, licensed stock fetch in connected mode. Saliency crop, brand colour grading, legibility scrims, image QA, licence metadata per asset (TRD 7.9) | M |
 | FR-V8 | Annotation layer at think-cell level: difference arrows, CAGR arrows, totals, end values, average lines, period bands, callouts with pins, aligned data rows (TRD 7.3) | M |
 | FR-V9 | Designed component library: KPI and big-number stacks, takeaway sidebars, focus panels, flags, isometric bars and blocks (keynote family), highlight-region maps, Harvey balls, trackers, stickers | M |
 | FR-V10 | Typography system: title, statement, big-number, body, label, footnote roles with size and weight tokens. Real font metrics drive text fitting. Fonts embedded or restricted to fonts present on recipient machines (TRD 7.8) | M |
@@ -269,13 +273,14 @@ References for the principles: B. Minto, *The Pyramid Principle* (Pearson), and 
 
 | Metric | Definition | Pilot target | Measured by |
 |---|---|---|---|
-| Slide keep rate | Share of generated slides kept with no or minor edits | at least 70% | Expert review on golden set and pilot logs |
-| Blind preference | Share of pairwise comparisons where experts rate the generated slide at least equal to a human consulting slide on the same brief | at least 40% at pilot, 60% at GA | Blind pairwise study |
+| Slide keep rate | Share of generated slides kept with no or minor edits | at least 70% | Pilot logs. Before pilot: reconstruction similarity on inverted corpus briefs plus founder review of 20 slides per milestone |
+| Blind preference | Share of pairwise comparisons where the generated slide is rated at least equal to the corpus slide for the same inverted brief | at least 40% at pilot, 60% at GA | Discriminator confusion rate, plus founder blind review of 20 pairs per milestone |
 | Storyline approval | Storylines approved with at most 2 edits | at least 60% | Pilot logs |
 | Untracked numbers | Numbers in output not linked to a data item | 0 | Hard gate |
-| Citation accuracy | Sourced numbers that a human auditor confirms match the cited passage (value, unit, scope, period) | at least 95% | Audit of 200 sampled numbers per release |
+| Citation accuracy | Sourced numbers that match the cited passage (value, unit, scope, period) | at least 95% | Automated re-fetch and verifier re-check of all sourced numbers, founder audit of 20 per release |
 | Fabricated sources | Citations to URLs or passages that do not exist | 0 | Audit |
-| Critical defect escape rate | Slides passing QA that experts mark with a critical defect | at most 5% | Held-out labelled set |
+| Critical defect escape rate | Slides passing QA that carry a critical defect | at most 5% | Held-out synthetic defect suite and SlideAudit labels |
+| Image QA pass | Images passing QA-9 on first attempt | at least 80% | Telemetry |
 | Render integrity | Files needing PowerPoint repair on open | 0 | Automated plus manual checks |
 | Time to first full draft | Brief approved to complete deck, 20 slides, research on | at most 15 min (reference hardware) | Telemetry |
 | Template onboarding time | New customer template to approved archetype gallery | at most 1 working day | Onboarding logs |
@@ -303,6 +308,8 @@ References for the principles: B. Minto, *The Pyramid Principle* (Pearson), and 
 | Research returns wrong or stale numbers | Medium | High | Verifier, source tiers, cross-checks, dates on every citation, conservative fallback to dummy |
 | LibreOffice renders differently from PowerPoint, so QA sees a slightly different slide | Medium | Medium | Bundle fonts. Periodic fidelity checks on a Windows PowerPoint worker. Geometry checks run on the object model, not pixels |
 | GPU cost of on-prem deployment deters buyers | Medium | Medium | Two hardware tiers, smaller models for judges, measured sizing in M8 |
+| Self-supervised proxies are gamed (Goodhart): critics reward what they can measure, not what clients value | Medium | High | Hard checks gate every reward. Several independent critics. Founder review per milestone as anchor and stop condition |
+| Generated imagery looks generic or uncanny, or contains artefacts and text | Medium | Medium | Procedural first for abstract roles, QA-9, brand colour grading, negative-space briefs, fallback to procedural |
 
 ---
 
@@ -331,6 +338,8 @@ References for the principles: B. Minto, *The Pyramid Principle* (Pearson), and 
 | O7 | Which style families matter most for v1? The Accenture sample is corporate keynote, the Bain, BCG and McKinsey samples are consulting report style | Consulting report first, keynote second |
 | O8 | "Fonts made by the model" is read as: typography (font roles, sizes, weights, hierarchy) is designed by the system, not left at defaults. Correct? | Yes |
 | O3 | Team size, budget and target pilot date | 5 FTE, about 8 months to pilot |
-| O4 | Can you recruit 3 to 5 ex-consultants for about 500 hours of annotation and golden-set authoring over 6 months? | Required for trained QA models. No good substitute |
+| O4 | Answered: no hiring, self-supervised only (D13) | Closed |
+| O9 | GPU access for model serving, image generation and training: owned node, rented cloud GPUs, or both? Monthly budget? | One 4 x 80 GB node rented during M2 and M6 |
+| O10 | Allow network access from the build environment to image sources and model hubs (api.pexels.com, api.unsplash.com, api.openverse.org, huggingface.co) | Needed to test fetch and download weights |
 | O5 | First customer segment and any design partner in sight | Corporate strategy teams |
 | O6 | Typical customer GPU availability | Reference tier: one node with 4 x 80 GB GPUs |
