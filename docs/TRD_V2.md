@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Status | Draft V2, 2026-10-04 |
+| Status | Draft V2.1, 2026-10-04 |
 | Product scope | `docs/PRD_V2.md` |
 | Milestones | `docs/BUILD_PLAN.md` |
 
@@ -14,7 +14,7 @@ Conventions: **[F]** fact with source, **[E]** estimate to be validated, **[D]**
 
 1. **Models plan and judge, code renders.** No model writes PPTX XML or pixel positions. Models emit typed specs and a deterministic compiler builds the file. Same spec, same file. [D]
 2. **Numbers by reference.** Models never type factual numbers. They cite data item IDs and the compiler renders values. Hallucinated numbers become structurally impossible rather than something we hope to catch. [D]
-3. **Closed vocabularies.** Archetypes, chart types, frameworks and repair actions are enumerated. Models choose within them. This makes outputs checkable and failures attributable. [D]
+3. **Closed vocabularies, open composition.** Components, chart types, annotations, frameworks and repair actions are enumerated. Models compose layouts freely from them on a grid, and a constraint solver owns geometry. Outputs stay checkable and failures attributable without forcing every slide into a fixed template. [D]
 4. **Cheap checks first.** Deterministic rules run before any model-based judge. Judges run before any regeneration. [D]
 5. **Human checkpoint at the cheapest point.** The storyline is approved before slides are built. [D]
 6. **Model-agnostic.** Every model sits behind an OpenAI-compatible endpoint, so a customer can run self-hosted weights or a private cloud endpoint without code changes. [D]
@@ -254,9 +254,31 @@ END
 
 Charts no library supports natively (waterfall, Mekko, Gantt, Harvey balls) are built as tiered constructions (7.3).
 
-### 7.2 Archetype library (about 35)
+### 7.2 Slide grammar
 
-Each archetype is a parametric definition: grid regions, slot schema, per-slot text budgets, allowed chart types, and rendering function. Geometry is expressed in grid units so it adapts to any template's margins and columns.
+Generated decks look bland mostly because of rigid templates and default styling, not because of the language model (7.7). DeckForge separates *what the slide says and how it is composed*, which the model decides, from *exact geometry and drawing*, which code decides.
+
+```text
+SlideSpec (model output)
+  layout          grid composition of regions with relative weights, e.g. [title] / [chart 8 | sidebar 4] / [footnotes]
+  components      per region: chart, table, kpi_stack, text_block, framework, map, icon_row, callout, sticker
+  emphasis        which data points or elements carry the answer
+  annotations     difference_arrow(i,j), cagr(i,j), average_line, period_band, callout(target), total
+  typography      roles only (title, statement, big_number, body, label, footnote). Sizes come from tokens
+        |
+Constraint layout (kiwisolver, Cassowary algorithm)
+  grid snapping, margins, gutters, minimum sizes, measured text heights, reserved zones (sticker, tracker, logo)
+        |
+Renderer: native charts, tables, shapes and text at absolute positions
+```
+
+- Archetypes are stored as grammar templates. The planner starts from the best match and may change regions, components, emphasis and annotations.
+- The model never emits coordinates. The solver owns positions and reports infeasible specs as repairable defects (for example "region R needs 2 more lines than available").
+- Each style family (consulting report, engagement, keynote) has its own tokens and rules over the same grammar.
+
+#### 7.2.1 Seed archetypes (about 50 after corpus review)
+
+Geometry is expressed in grid units so archetypes adapt to any template's margins and columns.
 
 | Group | Archetypes |
 |---|---|
@@ -269,8 +291,9 @@ Each archetype is a parametric definition: grid regions, slot schema, per-slot t
 | Plans | Gantt roadmap, Milestone timeline, Next steps (owner, date), Phased waves |
 | Qualitative | Interview insights grid, Case example (situation, action, result), KPI dashboard, Org/governance chart |
 | Back matter | Sources and methodology |
+| From corpus review | Split statement with table or list grid, chart with aligned table, composition block with callout, map with callouts and ranked list, two-panel chart with panel titles, chart with big-number sidebar, Likert stacked bars, butterfly bars with delta column, small multiples with focus panel, agenda tracker divider, labelled-row executive summary, ranked priorities with icons, KPI row, comparison table with column highlight |
 
-The initial set is designed by the design lead from consulting conventions. Corpus mining (11.3) validates and adjusts it.
+The seed set is designed by the design lead from consulting conventions and the corpus notes in `docs/corpus_notes/`. Corpus mining (11.3) and reconstruction (11.5) validate and extend it.
 
 ### 7.3 Chart engine tiers
 
@@ -282,12 +305,20 @@ The initial set is designed by the design lead from consulting conventions. Corp
 
 Positioning overlays on native charts needs the plot-area geometry. The compiler fixes plot-area layout explicitly (manual layout in chart XML) so overlay positions are computable rather than guessed.
 
+T3 additions from corpus review: isometric bars and composition blocks (keynote family, height-proportional by construction), marginal abatement cost curve (variable-width bars), highlight maps (public-domain Natural Earth boundaries simplified into editable freeform shapes), butterfly bars with delta column, Likert bars with flag markers.
+
+**think-cell parity checklist (M1 scope):** difference arrows (bar to bar and level), CAGR arrows, totals on stacked charts, series connector lines, category gaps, axis breaks, value and average lines, top-tick units, label collision avoidance, same-scale small multiples, number formatting rules, waterfalls with subtotals, Mekko (percentage and unit), Gantt with milestones, Harvey balls, check marks, agenda and tracker.
+
+**Spec persistence:** the SlideSpec and data are stored inside the PPTX (custom XML part plus role-named shapes). On re-import DeckForge rebuilds overlays from edited chart data, so T2 and T3 visuals follow user edits.
+
+**Evidence:** `spikes/visual_proof/` rebuilt Bain and McKinsey benchmark slides as native objects with computed overlays at near-parity, and its geometry lint caught two real layout collisions on first run.
+
 ### 7.4 Chart rules (deterministic, used by compiler and chart gate)
 
 | # | Rule |
 |---|---|
 | C1 | Bar and column value axes start at zero |
-| C2 | No 3D, no gradients, no shadows |
+| C2 | No 3D, gradients or shadows in consulting families. Keynote family allows isometric bars and blocks only with direct value labels and proportional geometry |
 | C3 | Item comparisons sorted descending unless order is natural (time, size bands) |
 | C4 | Pie only for at most 5 components summing to 100%. Otherwise 100% bar |
 | C5 | Line charts at most 5 series. Column time series at most about 12 periods, else line |
@@ -316,6 +347,28 @@ Each slot has a box size. The compiler computes wrapped line count and height fr
 | Data request list | Every dummy item, grouped by owner if given |
 | Sources appendix | Generated slides listing all sourced items with publisher, date, URL |
 | QA report | JSON plus a readable summary |
+
+### 7.7 Why generated decks look bland, and the countermeasures
+
+| Cause | Countermeasure |
+|---|---|
+| Library defaults (Calibri, Office palette, legends, gridlines, borders) | Token-driven styling of every chart element. A lint rule fails any element left at library default |
+| One layout repeated (title plus bullets) | Slide grammar with about 50 archetypes and free composition. QA-1 checks layout variety across the deck |
+| Text carries the message instead of evidence | Planner must choose an analysis and visual per message from the framework library. Bullet-only slides capped per deck |
+| No emphasis | Mandatory `emphasis` field: answer colour, big-number roles, focus panels |
+| No annotation | Annotation layer is part of the spec. QA-3 flags change claims without a difference or CAGR marker |
+| Decorative visuals | Icons and flags only as category markers. No stock imagery in consulting families |
+| Weak typography | Typography roles with contrast ratios (title to body, big number to body) measured from the corpus |
+
+Supporting evidence: DeepSlides [F7] separates slide design from implementation and trains Qwen-based models for design (SlideQwens). The authors report it beats baselines in human preference, which addresses decks that are "visually dull, compositionally weak". The visual ceiling is set by the design layer and its training, not by the LLM family that writes the content.
+
+### 7.8 Typography and fonts
+
+- Roles: title, subtitle, statement, big_number, body, label, footnote, source. Each role has font, size, weight, colour and leading tokens per family.
+- Text fitting uses glyph advances from the real font files (7.5). The spike measures with metric-compatible open fonts (Liberation Sans for Arial, Gelasio for Georgia).
+- Default consulting family: bold serif titles, sans body. To avoid font substitution on recipients' machines the default uses fonts present on Windows and macOS Office installs (for example Georgia and Arial), or embeds fonts licensed for embedding through custom OOXML, since python-pptx has no embedding API.
+- Customer templates bring their own fonts. Onboarding verifies that the font files are available to compiler and render workers.
+- Proprietary firm fonts are never shipped.
 
 ---
 
@@ -395,7 +448,7 @@ This is the subsystem that enforces top-consulting quality. Each gate is a layer
 
 **QA-5 Layout and design defect classifier**
 - Labels: SlideAudit, 2,400 slides labelled across 19 deficiency types in 4 categories (composition and layout, typography, colour, imagery), with annotator-agreement flags and bounding boxes, CC BY 4.0 [F6]. Its slides come from three sources and include controlled alterations (layout, alignment, texture, jitter), 600 each, verified locally.
-- Synthetic negatives on our own domain: take good compiled slides and inject known defects through the compiler (misalign by k grid units, overflow, mixed fonts, palette breach, clutter by adding elements, low contrast). Ground truth is exact because we created the defect.
+- Synthetic negatives on our own domain: take good compiled slides, including reconstructed corpus slides (11.5), and inject known defects through the compiler (misalign by k grid units, overflow, mixed fonts, palette breach, clutter by adding elements, low contrast). Ground truth is exact because we created the defect.
 - Expert labels: about 3,000 rendered slides labelled by ex-consultants with the same taxonomy plus consulting-specific defects (no action title, legend instead of direct labels, unsourced chart).
 - Model: small VLM with LoRA, multi-label head. Metric: per-label precision and recall, with recall prioritised for critical labels.
 
@@ -418,6 +471,7 @@ This is the subsystem that enforces top-consulting quality. Each gate is a layer
 **QA-7 Consulting-grade preference**
 - Expert pairwise comparisons of slide renders for the same message: generated vs generated, generated vs expert-made.
 - Weak pairs: expert-made slides preferred over the same content in a generic layout.
+- Corpus pairs (D9): each reconstructed corpus slide (11.5) preferred over its own content rendered in a generic layout. This yields thousands of pairs without labelling.
 - Used for best-of-N selection and as a soft flag. Not a hard gate, because taste models are the least reliable component. [O]
 
 ### 10.3 Calibration and policy
@@ -437,16 +491,16 @@ This is the subsystem that enforces top-consulting quality. Each gate is a layer
 
 ## 11. Corpus and data program
 
-### 11.1 Clean-room data policy [D]
+### 11.1 Data-use policy [D]
 
-Not legal advice. To be reviewed by IP counsel before any training run.
+Founder decision D9 allows training on the public corpus. Residual risk is accepted and recorded in PRD section 9. Not legal advice.
 
-| Tier | Content | Allowed use |
-|---|---|---|
-| A: owned or licensed | Decks and storylines commissioned from contracted ex-consultants on public topics with IP assignment, SlideAudit (CC BY 4.0, attribution required), data generated by our own pipeline or by Apache-2.0 open models, licensed datasets | Training shipped models, exemplars shipped in product |
-| B: public, rights unknown | The 144 public firm decks in `consulting_corpus`, PPTBench and similar | Internal analysis and statistics, evaluation, only after counsel review. Never in shipped weights, never shown or copied in output |
-| C: excluded | Anything marked confidential or permission-required, client material, former-employer material without written clearance | No use |
-| T: tenant data | A customer's own decks inside their deployment | Per-tenant adaptation inside that tenant only. Never pooled |
+| Tier | Content | Allowed use | Safeguards |
+|---|---|---|---|
+| A: owned or licensed | Commissioned decks with IP assignment, SlideAudit (CC BY 4.0, attribution), our own synthetic data | Training, exemplars shipped in product | Attribution file |
+| B: public corpus | Public firm decks in `consulting_corpus` and similar | Training (D9), statistics, evaluation | Logos and wordmarks masked before training. No verbatim reuse: outputs checked by n-gram and embedding similarity against the corpus. Provenance log per training example. Machine-readable opt-outs honoured. Files marked permission-required stay excluded |
+| C: excluded | Confidential, internal-use-only, permission-required, client material | None | |
+| T: tenant data | A customer's own decks inside their deployment | Per-tenant adaptation inside that tenant only | Never pooled |
 
 Several API providers' terms restrict using their outputs to train other models. Synthetic training data should therefore come from permissively licensed open models unless counsel clears otherwise.
 
@@ -484,6 +538,26 @@ Corpus facts today: 144 public files, 6,192 pages, 142 PDF and 2 PPTX, 130 files
 
 Annotators: 3 to 5 ex-consultants. Quality: 15% overlap, target Cohen's kappa at least 0.6 per label family. Labels with lower agreement are merged or dropped.
 
+### 11.5 Corpus-to-spec reconstruction (inverse rendering)
+
+The most direct way to make the generator think like top firms is to express corpus slides in DeckForge's own output language and train on that.
+
+```text
+corpus page -> VLM parse: regions, components, text, chart type, values read from labels
+            -> candidate SlideSpec in the slide grammar
+            -> compile and render
+            -> compare with original: region layout overlap, text match, perceptual similarity
+            -> accept above threshold, else review queue
+```
+
+Uses:
+1. **Training pairs.** Accepted reconstructions give (message, data) to (archetype, layout, components, emphasis, annotations) pairs for the planner. Deck sequences give storyline examples.
+2. **Coverage metric.** The share of corpus content slides the grammar can reconstruct measures its expressiveness. Failures point to missing components. Target at least 70% by M6 [E].
+3. **Preference pairs** for QA-7 (10.2).
+4. **Style statistics** computed in grammar space (region proportions, density, emphasis use) rather than pixels.
+
+Volume [E]: 6,192 pages. Perhaps 60 to 70% are content slides, and 60 to 80% of those reconstruct on first pass, giving roughly 2,200 to 3,500 slide-level pairs from the public corpus before your own decks.
+
 ---
 
 ## 12. Generator adaptation ladder
@@ -491,7 +565,7 @@ Annotators: 3 to 5 ex-consultants. Quality: 15% overlap, target Cohen's kappa at
 | Level | Method | Entry condition | Exit evidence |
 |---|---|---|---|
 | L0 | Schema-constrained prompting, retrieved Tier A exemplars, style rules in system prompt | Default | Baseline on golden set |
-| L1 | LoRA supervised fine-tuning on Tier A pairs: brief to storyline, slide plan to SlideSpec. 2k to 5k pairs [E] from commissioned work plus teacher-generated and expert-filtered data | L0 keep rate below target, or gap to frontier baseline above 15 points | Significant keep-rate gain on held-out briefs |
+| L1 | LoRA supervised fine-tuning on reconstructed corpus pairs (11.5) and Tier A pairs: brief to storyline, message and data to SlideSpec. About 2k to 3.5k corpus pairs plus commissioned and teacher-generated data [E] | L0 keep rate below target, or gap to frontier baseline above 15 points | Significant keep-rate gain on held-out briefs |
 | L2 | Preference optimisation (DPO) on expert and pilot-user chosen vs rejected outputs | After pilot, with at least 2k preference pairs | Gain in blind preference win rate |
 | L3 | Per-tenant LoRA from the customer's own decks and edits | V1.1, customer opt-in | Tenant keep-rate gain |
 
@@ -543,7 +617,7 @@ Frontier baseline: run a top proprietary model on the non-confidential golden br
 | Orchestration | LangGraph with Postgres checkpointer |
 | Model serving | vLLM with OpenAI-compatible API and JSON-schema guided decoding |
 | Training | PyTorch, Hugging Face Transformers, PEFT (LoRA), TRL (SFT, reward modelling, DPO) |
-| PPTX | python-pptx, lxml, fontTools |
+| PPTX | python-pptx, lxml, fontTools or Pillow for glyph metrics, kiwisolver for constraint layout |
 | Workbooks | openpyxl, pandas |
 | Rendering | LibreOffice headless, PyMuPDF |
 | Research | Pluggable search adapter, httpx, trafilatura |
@@ -554,7 +628,22 @@ Frontier baseline: run a top proprietary model on the non-confidential golden br
 
 ---
 
-## 17. References
+## 17. Framework and analysis knowledge base
+
+Content: `docs/FRAMEWORK_LIBRARY.md` (catalogue, message-type mapping, YAML schema).
+
+| Component | Detail |
+|---|---|
+| Store | YAML entries under `deckforge/knowledge/frameworks/`, versioned, schema-validated in CI |
+| Retrieval | Question-type classifier on the brief plus embedding retrieval over triggers and descriptions |
+| Planner integration | Storyline writer receives candidate analyses with data needs and visuals. Chosen analyses become `DataNeed`s and `ChartSpec` defaults |
+| Calculations | Each numeric analysis binds to a deterministic, unit-tested calc module (`pvm_bridge`, `cagr`, `synergy_phasing`, `npv_irr`, `oee_waterfall`, `mekko_shares`) |
+| Corpus link | Corpus slides tagged with framework ids give frequencies, exemplars and training pairs (11.5) |
+| QA link | QA-1 coverage (every brief question has an analysis), QA-3 framework pitfalls |
+
+---
+
+## 18. References
 
 - [F1] Qwen3.5 family: open weights, Apache 2.0, sizes 0.8B to 397B-A17B including 122B-A10B, 35B-A3B, 27B, natively multimodal, released February 2026. [DeepLearning.AI, The Batch](https://www.deeplearning.ai/the-batch/alibabas-latest-flagship-models-are-open-weights-moe-performers-in-sizes-from-less-than-1b-parameters), [Hugging Face Qwen org](https://huggingface.co/Qwen)
 - [F2] LangGraph overview. [LangChain docs](https://docs.langchain.com/oss/python/langgraph/overview)
@@ -565,3 +654,7 @@ Frontier baseline: run a top proprietary model on the non-confidential golden br
 - Zheng et al. *PPTAgent: Generating and Evaluating Presentations Beyond Text-to-Slides.* [arXiv:2501.03936](https://arxiv.org/abs/2501.03936). Reference-slide analysis and the PPTEval content, design, coherence dimensions inform QA-1, QA-5 and QA-7
 - think-cell JSON data automation (`.ppttc`, `ppttc.exe` on Windows with PowerPoint and think-cell installed). [think-cell manual](https://www.think-cell.com/en/resources/manual/jsondataautomation)
 - B. Minto, *The Pyramid Principle*, Pearson. G. Zelazny, *Say It With Charts*, McGraw-Hill
+- [F7] Cui et al. *Design First, Code Later: Aesthetically Pleasing Template-Free Slides Generation* (DeepSlides). [arXiv:2605.26451](https://arxiv.org/abs/2605.26451)
+- Natural Earth public-domain map data. [naturalearthdata.com](https://www.naturalearthdata.com/)
+- kiwisolver (Cassowary constraint solver). [github.com/nucleic/kiwi](https://github.com/nucleic/kiwi)
+- Gelasio, SIL Open Font Licence, metric-compatible with Georgia. [github.com/google/fonts](https://github.com/google/fonts/tree/main/ofl/gelasio)

@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Status | Draft V2, 2026-10-04. Supersedes `Presentation_Maker_PRD_V1.md` |
+| Status | Draft V2.1, 2026-10-04. Supersedes `Presentation_Maker_PRD_V1.md` |
 | Companion docs | `docs/TRD_V2.md` (technical design), `docs/BUILD_PLAN.md` (milestones), `docs/PRD_V1_review_and_open_questions.md` (rationale for changes) |
 | Codename | DeckForge (placeholder) |
 
@@ -22,6 +22,10 @@
 | D6 | User data arrives as Excel or CSV. Where data is missing, the product inserts editable dummy data |
 | D7 | Web research with citations is in scope for v1 |
 | D8 | Trained QA decision models must check storyline flow, charts, factuality and standards against top-consulting quality |
+| D9 | The public consulting corpus may be used for training. Founder decision, residual legal and procurement risk accepted (section 9). Safeguards in TRD 11.1 |
+| D10 | Visual output must be designed, not generic. Charts, graphics and typography are produced by DeckForge's own rendering engine as native PowerPoint objects to top-firm craft. No image-based charts, no library-default styling |
+| D11 | The system must know consulting frameworks and analyses, and choose the analysis and visual from the business question (`docs/FRAMEWORK_LIBRARY.md`) |
+| D12 | Multiple style families are supported. Default is consulting style (section 6) |
 
 ### 0.2 Working assumptions (change if wrong)
 
@@ -116,13 +120,29 @@ Priority: **M** = MVP (pilot), **V1.1** = after pilot, **L** = later.
 
 | ID | Requirement | Pri |
 |---|---|---|
-| FR-V1 | Closed library of about 35 slide archetypes (TRD 7.2). The model chooses and fills archetypes and cannot invent free-form layouts | M |
+| FR-V1 | Slide grammar (TRD 7.2): the model composes layouts from grid regions and a closed set of components. About 50 archetypes learned from the corpus act as starting points, not cages. A constraint solver guarantees alignment | M |
 | FR-V2 | Chart catalogue with three tiers (native, native plus overlay, shape-built), covering bar/column families, line, area, pie/doughnut, scatter, bubble, waterfall, Marimekko, Gantt, Harvey-ball tables, 2x2 matrices, CAGR annotations | M |
 | FR-V3 | Chart type chosen from the message type (component, item, time series, frequency, correlation, bridge, schedule, assessment, prioritisation) | M |
 | FR-V4 | Frameworks and diagrams: process chevrons, issue trees, pillars, timelines, org charts, value chains, as editable grouped shapes | M |
 | FR-V5 | Icons from a licensed, customer-replaceable icon set | V1.1 |
 | FR-V6 | Message emphasis in charts: highlight colour on the data that proves the title, everything else neutral | M |
-| FR-V7 | Photos, AI-generated imagery, animations | L |
+| FR-V7 | AI-generated imagery, animations | L |
+| FR-V8 | Annotation layer at think-cell level: difference arrows, CAGR arrows, totals, end values, average lines, period bands, callouts with pins, aligned data rows (TRD 7.3) | M |
+| FR-V9 | Designed component library: KPI and big-number stacks, takeaway sidebars, focus panels, flags, isometric bars and blocks (keynote family), highlight-region maps, Harvey balls, trackers, stickers | M |
+| FR-V10 | Typography system: title, statement, big-number, body, label, footnote roles with size and weight tokens. Real font metrics drive text fitting. Fonts embedded or restricted to fonts present on recipient machines (TRD 7.8) | M |
+| FR-V11 | Style families: consulting report, consulting engagement, corporate keynote. Each family has its own rule set (section 6) | M |
+| FR-V12 | Series consistency: repeated chart with shifting focus across consecutive slides | V1.1 |
+| FR-V13 | Background imagery only from a customer-approved image library | V1.1 |
+
+### 4.4.1 Frameworks and analyses (FR-F)
+
+| ID | Requirement | Pri |
+|---|---|---|
+| FR-F1 | Framework library of about 75 analyses (`docs/FRAMEWORK_LIBRARY.md`), each with question types, data inputs, calculation, canonical visual, title patterns and pitfalls | M (30) / V1.1 (75) |
+| FR-F2 | Storyline planner maps the brief to question types, then to analyses, then to data needs and visuals | M |
+| FR-F3 | Analyses with numbers run through deterministic calculation modules (PVM, CAGR, synergy phasing, NPV) | M |
+| FR-F4 | QA checks coverage (every brief question answered by at least one analysis) and per-framework pitfalls | M |
+| FR-F5 | Industry packs with sector KPIs and benchmarks | L |
 
 ### 4.5 Template and brand configuration (FR-T)
 
@@ -206,9 +226,21 @@ Rules:
 
 ---
 
-## 6. Default consulting house style
+## 6. Style families and the default consulting style
 
-Quality target: indistinguishable in a blind review from slides produced by top-tier strategy firms. The style is defined by principles, not by copying any firm's trade dress. The product ships no firm's logo, proprietary fonts or templates.
+Quality target: indistinguishable in a blind review from slides produced by top-tier strategy firms. The style is defined by principles and techniques learned from the corpus, not by copying any firm's trade dress. The product ships no firm's logo, proprietary fonts or templates.
+
+### 6.1 Style families
+
+Corpus review (`docs/corpus_notes/`) shows distinct families with different rules:
+
+| Family | Typical use | Signature | Example in corpus |
+|---|---|---|---|
+| Consulting report (default) | Research, market studies, board updates | Quantified action titles, one answer colour, think-cell style annotation, takeaway sidebar, sources with n | Bain PE report, McKinsey DACH survey |
+| Consulting engagement | Steerco packs, working sessions | Denser, trackers every page, frameworks, "Preliminary" and "Draft" markers, ghost charts | Under-represented in public corpus |
+| Corporate keynote | Investor days, town halls, launches | Low density, big-number typography, crafted 3D blocks, imagery | Accenture investor conference |
+
+### 6.2 Default consulting style principles
 
 Measurable principles (thresholds calibrated from corpus statistics in TRD 11.3, then reviewed by design lead):
 
@@ -220,12 +252,14 @@ Measurable principles (thresholds calibrated from corpus statistics in TRD 11.3,
 | P4 | Chart type follows the comparison being made | Chart fit rules plus classifier |
 | P5 | Highlight colour only on the data that proves the title | Chart rules |
 | P6 | Every data slide has a source line and units. Footnotes explain definitions | Lint |
-| P7 | Sober palette: one primary, one highlight, greys. No 3D, no gradients, no shadows on data | Lint |
+| P7 | Sober palette: one primary, one answer colour, greys. No 3D, gradients or shadows on data in consulting families. Keynote family allows isometric bars and blocks with direct labels | Lint |
 | P8 | Strict grid and alignment. Consistent title, body and footnote positions across slides | Geometry lint |
 | P9 | Text density inside calibrated bands (title words, body words, bullets) | Lint |
 | P10 | Numbers formatted consistently (units, decimals, currency, period labels) | Lint |
 | P11 | Tracker/chapter marker on content slides for decks over about 12 slides | Lint |
 | P12 | Executive summary that mirrors the storyline | Storyline model |
+| P13 | Annotation carries the message: difference or CAGR arrow, end value, average line or callout on every data slide where a change or comparison is claimed | Chart rules |
+| P14 | Analyses chosen from the business question via the framework library | QA-1 coverage check |
 
 References for the principles: B. Minto, *The Pyramid Principle* (Pearson), and G. Zelazny, *Say It With Charts* (McGraw-Hill). Both describe methods, which are not protected the way specific decks are.
 
@@ -262,7 +296,7 @@ References for the principles: B. Minto, *The Pyramid Principle* (Pearson), and 
 
 | Risk | Likelihood | Impact | Mitigation |
 |---|---|---|---|
-| Training data rights. Public firm decks have unknown rights and terms of use that restrict commercial reuse | High | High (legal, product cannot ship) | Clean-room data policy (TRD 11.1). Counsel review before any training. Commissioned and licensed data for shipped models |
+| Training data rights. Founder decision D9 uses public firm decks for training. Public availability is not a licence: US fair use is decided case by case, the EU allows commercial text-and-data mining unless the rightsholder opted out, India has no specific exception, and some firms' terms of use restrict commercial use. Enterprise buyers increasingly ask for training-data provenance and indemnities | Medium | High (legal, procurement) | Safeguards in TRD 11.1: no logos or proprietary fonts, no verbatim reproduction (similarity filter on outputs), provenance log per training example, opt-out honouring, counsel review before GA. Commissioned data as a clean fallback |
 | Open-weight models on customer hardware trail frontier models on writing and judgement | Medium | High | Early benchmark against a frontier baseline on non-confidential briefs. Fine-tuning and judges sized to close the gap. Private-cloud model mode as fallback |
 | Consulting-grade layout is harder than it looks (text fitting, chart overlays, Mekko) | Medium | High | Compiler spike first (BUILD_PLAN M1). Designer in the loop from week 1 |
 | Customer templates are messy (broken layouts, hard-coded positions) | High | Medium | Onboarding tool with synthesised layouts and admin approval |
@@ -278,7 +312,8 @@ References for the principles: B. Minto, *The Pyramid Principle* (Pearson), and 
 |---|---|---|---|
 | Inputs | Brief, Excel/CSV | PDF/DOCX/PPTX sources | Connectors (SharePoint, Drive) |
 | Story | Storyline with checkpoint, exec summary | Storyline variants | Audience-specific re-cuts |
-| Visuals | 35 archetypes, chart tiers T1 to T3, frameworks | Icons, more archetypes | think-cell adapter |
+| Visuals | Slide grammar, 50 archetypes, chart tiers T1 to T3, annotation layer, component library | Icons, series focus, keynote family | think-cell adapter |
+| Knowledge | 30 frameworks | 75 frameworks | Industry packs |
 | Data | Placeholder contract, workbook round trip, web research | Document-grounded extraction | Live data connectors |
 | QA | Rule gates, prompted judges, first trained design model | Full trained QA suite | Continuous learning from edits |
 | Brand | Template ingestion, gallery approval | Rule editor, multi-template | Auto-learning from customer decks |
@@ -292,7 +327,9 @@ References for the principles: B. Minto, *The Pyramid Principle* (Pearson), and 
 | ID | Question | Default if no answer |
 |---|---|---|
 | O1 | Is a model hosted in the customer's own cloud tenancy acceptable as "on-prem", or must everything run on customer GPUs, possibly air-gapped? | Support both. Self-hosted open-weight is the reference |
-| O2 | Which slides in the corpus are yours, and who owns the IP (you, a former employer, clients)? | Treated as not cleared for training until confirmed |
+| O2 | Answered: corpus is from public sources, founder accepts the training risk (D9) | Closed |
+| O7 | Which style families matter most for v1? The Accenture sample is corporate keynote, the Bain, BCG and McKinsey samples are consulting report style | Consulting report first, keynote second |
+| O8 | "Fonts made by the model" is read as: typography (font roles, sizes, weights, hierarchy) is designed by the system, not left at defaults. Correct? | Yes |
 | O3 | Team size, budget and target pilot date | 5 FTE, about 8 months to pilot |
 | O4 | Can you recruit 3 to 5 ex-consultants for about 500 hours of annotation and golden-set authoring over 6 months? | Required for trained QA models. No good substitute |
 | O5 | First customer segment and any design partner in sight | Corporate strategy teams |

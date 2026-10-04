@@ -16,3 +16,6 @@ consulting_corpus/previews/
 reference_reports/files/
 research_datasets/pptbench/raw_parquet/
 research_datasets/slideaudit/full_release/data/
+
+# Spike outputs: regenerable, and comparison renders include third-party pages
+spikes/**/out/
