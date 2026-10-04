@@ -30,7 +30,8 @@ pytest -q
 |---|---|
 | [docs/PRD_V2.md](docs/PRD_V2.md) | Product requirements (current) |
 | [docs/TRD_V2.md](docs/TRD_V2.md) | Technical design: architecture, schemas, compiler, QA decision models, data program |
-| [docs/BUILD_PLAN.md](docs/BUILD_PLAN.md) | Milestones, exit criteria, team, timeline |
+| [docs/build/README.md](docs/build/README.md) | Build plan V3: architecture, tech stack, LangGraph orchestration, LLM and Laya layers, caching, deployment with nginx, and 100 implementation tickets |
+| [docs/BUILD_PLAN.md](docs/BUILD_PLAN.md) | Build plan V2 (superseded, kept for history) |
 | [docs/FRAMEWORK_LIBRARY.md](docs/FRAMEWORK_LIBRARY.md) | Consulting frameworks and analyses: question, data, visual, pitfalls |
 | [docs/corpus_notes/](docs/corpus_notes/) | Deconstructions of corpus decks (Accenture, Bain, BCG, McKinsey) |
 | [spikes/visual_proof/](spikes/visual_proof/) | Native-chart rebuild of benchmark slides with computed overlays and geometry lint |

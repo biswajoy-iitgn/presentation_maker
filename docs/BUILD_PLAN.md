@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Status | V2, 2026-10-04. Replaces the team-based plan (no hiring, D13. Claude Code builds, D15) |
+| Status | V2, 2026-10-04. Superseded for implementation by the V3 plan in `docs/build/README.md` (architecture, stack, tickets). Kept for the milestone history and the M1 record |
 | Scope | `docs/PRD_V2.md` |
 | Design | `docs/TRD_V2.md` |
 
