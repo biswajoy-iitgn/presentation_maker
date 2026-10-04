@@ -1,6 +1,6 @@
 # PRD V1 review and open questions
 
-Status: draft for discussion, 2026-10-04. Input to PRD V2 and the build plan.
+Status: answered in part on 2026-10-04. Decisions are recorded in `docs/PRD_V2.md` section 0. Kept for rationale.
 Scope of review: `Presentation_Maker_PRD_V1.md`, corpus manifests under `consulting_corpus/` and `dataset_acquisition/`, research dataset notes under `research_datasets/`. Your own consulting decks are not uploaded yet, so every corpus figure below refers to the public corpus only.
 
 ---
