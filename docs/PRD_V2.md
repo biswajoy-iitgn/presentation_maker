@@ -27,7 +27,7 @@
 | D11 | The system must know consulting frameworks and analyses, and choose the analysis and visual from the business question (`docs/FRAMEWORK_LIBRARY.md`) |
 | D12 | Multiple style families are supported. Default is consulting style (section 6) |
 | D13 | No hiring. All learning is self-supervised: corpus, synthetic data with exact labels, verifiable checks, public labelled datasets (TRD 11.4) |
-| D14 | The models generate or fetch imagery (backgrounds, photos, abstract art) so decks match the visual standard of the samples (TRD 7.9) |
+| D14 | The presentation maker generates or fetches anything a slide requires: backgrounds, photos, illustrations, icons, flags, maps, logos, fonts, data, so decks match the visual standard of the samples (TRD 7.9) |
 | D15 | Claude Code builds the product. The founder provides decisions, compute, corpus access, network allow-listing and a one-hour review per milestone |
 
 ### 0.2 Working assumptions (change if wrong)
@@ -130,7 +130,7 @@ Priority: **M** = MVP (pilot), **V1.1** = after pilot, **L** = later.
 | FR-V5 | Icons from a licensed, customer-replaceable icon set | V1.1 |
 | FR-V6 | Message emphasis in charts: highlight colour on the data that proves the title, everything else neutral | M |
 | FR-V7 | Animations | L |
-| FR-V14 | Imagery by role (cover, divider, header band, side panel, message-panel photo, backdrop): procedural generation, local open-weight text-to-image, licensed stock fetch in connected mode. Saliency crop, brand colour grading, legibility scrims, image QA, licence metadata per asset (TRD 7.9) | M |
+| FR-V14 | Asset resolver: for every asset need (backgrounds, photos, illustrations, icons, flags, maps, logos, fonts, screenshots) choose generate, compose or fetch by type and deployment mode. Saliency crop, brand colour grading, legibility scrims, asset QA, provenance and licence per asset, AI-generated marking (TRD 7.9) | M |
 | FR-V8 | Annotation layer at think-cell level: difference arrows, CAGR arrows, totals, end values, average lines, period bands, callouts with pins, aligned data rows (TRD 7.3) | M |
 | FR-V9 | Designed component library: KPI and big-number stacks, takeaway sidebars, focus panels, flags, isometric bars and blocks (keynote family), highlight-region maps, Harvey balls, trackers, stickers | M |
 | FR-V10 | Typography system: title, statement, big-number, body, label, footnote roles with size and weight tokens. Real font metrics drive text fitting. Fonts embedded or restricted to fonts present on recipient machines (TRD 7.8) | M |

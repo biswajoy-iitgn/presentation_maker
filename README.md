@@ -2,6 +2,24 @@
 
 DeckForge: brief in, consulting-grade editable PPTX out, with grounded numbers and QA gates. On-prem, configurable to each customer's template.
 
+## Quick start
+
+```bash
+pip install -e ".[dev]"
+sudo apt-get install -y libreoffice-impress fonts-liberation   # rendering and metric-compatible fonts
+python -m deckforge.demo.build_demo out/demo                    # builds a 10-slide demo deck, lints and repairs it
+pytest -q
+```
+
+## Package layout
+
+| Path | What it does |
+|---|---|
+| `deckforge/render/` | Canvas with placement records, font-metric text fitting, native charts with pinned plot areas, annotation overlays, layout furniture |
+| `deckforge/assets/` | Asset resolver: procedural backgrounds, open icons and flags, Natural Earth map shapes, stock photo APIs, local text-to-image client and reference GPU server, treatment (crop, grading, scrims) and image QA, provenance records |
+| `deckforge/qa/` | Geometry and legibility lint, deterministic repairs (backlights behind low-contrast text) |
+| `deckforge/demo/` | Demo deck exercising every capability with illustrative data |
+
 ## Documents
 
 | Doc | Purpose |

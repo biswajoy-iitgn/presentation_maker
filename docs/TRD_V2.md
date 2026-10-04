@@ -370,9 +370,27 @@ Supporting evidence: DeepSlides [F7] separates slide design from implementation 
 - Customer templates bring their own fonts. Onboarding verifies that the font files are available to compiler and render workers.
 - Proprietary firm fonts are never shipped.
 
-### 7.9 Imagery pipeline
+### 7.9 Asset pipeline (generate or fetch anything a slide needs)
 
-Decision D14: DeckForge generates or fetches imagery so decks reach the visual standard of the samples (Accenture abstract-light cover and architectural backdrops, BCG photo header bands and side panels, Bain photo with message panel).
+Decision D14: DeckForge acquires every asset a slide needs by itself, by generating, composing or fetching it, so decks reach the visual standard of the samples (Accenture abstract-light cover and architectural backdrops, BCG photo header bands and side panels, Bain photo with message panel, McKinsey flags and icons).
+
+**Asset resolver.** The planner emits an `AssetNeed` per slide element (type, role, subject, style, constraints). The resolver walks a source chain chosen by asset type and deployment mode, treats each candidate, runs QA, picks the best, and records provenance and licence in an `AssetRecord`. Generated assets are flagged as AI-generated in file metadata and alt text, in line with transparency duties for synthetic content.
+
+| Asset type | Generate or compose | Fetch | Never |
+|---|---|---|---|
+| Backgrounds, textures, abstract art | Procedural (code), text-to-image | Stock APIs | |
+| Photos (places, industries, scenes) | Text-to-image | Stock APIs, customer library | Real identifiable people generated |
+| Illustrations, spot art | Text-to-image in flat style | Open illustration sets | |
+| Icons | Recolour and resize | Open icon sets: Lucide (ISC), Tabler (MIT), bundled offline | Generating lookalikes of branded icons |
+| Flags | | flag-icons (MIT), bundled | Generated flags |
+| Maps | Native editable shapes composed from boundaries | Natural Earth (public domain), bundled | Generated maps |
+| Company logos (competitor, client, partner slides) | | Official site or Wikimedia, user confirmation required | Generated or altered logos |
+| People photos (team slides) | | User-supplied only | Generated portraits of real people |
+| Data and numbers | Calc engine | Web research with citations (section 9) | Model-typed numbers |
+| Charts, diagrams, frameworks | Native composition (sections 7.2, 7.3) | | Raster charts |
+| Fonts | | Open fonts (SIL OFL) bundled, customer fonts from template | Proprietary firm fonts |
+| Product or web screenshots | | Headless browser capture in connected mode | |
+| Quotes, case examples | | Research with citations | Invented quotes |
 
 **Image roles observed in the corpus:** full-bleed cover, section divider, header band, side panel, photo with overlaid message panel, subtle backdrop under content, case-example photo.
 
@@ -474,7 +492,7 @@ This is the subsystem that enforces top-consulting quality. Each gate is a layer
 | QA-6 Template conformance | Slide | Fonts, palette, positions, mandatory elements vs `DesignSystem` | Deterministic | Deterministic | Yes |
 | QA-7 Consulting-grade preference | Slide, deck | Overall "would a top-firm engagement manager accept this slide" | Prompted pairwise VLM judge against retrieved exemplars | Pairwise reward model on render plus spec | No (ranks variants, flags low scorers) |
 | QA-8 Data status | Deck | Remaining dummy data | Deterministic | Deterministic | Yes (final only) |
-| QA-9 Imagery | Slide | Relevance, aesthetics, technical quality, no text or watermark, no faces unless requested, legibility contrast, palette fit, duplicates (7.9) | Deterministic checks plus pretrained scorers | Same, thresholds calibrated on corpus imagery | Legibility and licence metadata only |
+| QA-9 Assets | Slide | Relevance, aesthetics, technical quality, no text or watermark, no faces unless requested, legibility contrast, palette fit, duplicates (7.9) | Deterministic checks plus pretrained scorers | Same, thresholds calibrated on corpus imagery | Legibility and licence metadata only |
 
 ### 10.2 Training recipes
 

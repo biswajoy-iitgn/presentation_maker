@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "deckforge"
+version = "0.1.0"
+description = "Consulting-grade presentation generator: native PPTX compiler, asset pipeline, QA"
+requires-python = ">=3.10"
+dependencies = [
+    "python-pptx>=1.0",
+    "pillow>=10",
+    "numpy>=1.26",
+    "cairosvg>=2.7",
+    "pydantic>=2.5",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[tool.setuptools.packages.find]
+include = ["deckforge*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["network: needs outbound access to GitHub raw content"]
