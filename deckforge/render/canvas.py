@@ -25,6 +25,13 @@ def rgb(hex_: str) -> RGBColor:
     return RGBColor.from_string(hex_.lstrip("#"))
 
 
+def _drop_theme_style(sp):
+    """Remove the theme style reference python-pptx adds to autoshapes (it brings shadows in some renderers)."""
+    style = sp._element.find(qn("p:style"))
+    if style is not None:
+        sp._element.remove(style)
+
+
 Box = tuple[int, int, int, int]   # x, y, w, h in EMU
 
 
@@ -94,6 +101,7 @@ class Canvas:
              register=True):
         sp = self.slide.shapes.add_shape(shape, x, y, w, h)
         sp.shadow.inherit = False
+        _drop_theme_style(sp)
         if fill is None:
             sp.fill.background()
         else:
@@ -126,6 +134,7 @@ class Canvas:
 
     def line(self, x1, y1, x2, y2, color, width=0.75, arrow_end=False, dash=False):
         c = self.slide.shapes.add_connector(MSO_CONNECTOR.STRAIGHT, x1, y1, x2, y2)
+        _drop_theme_style(c)
         c.line.color.rgb = rgb(color)
         c.line.width = Pt(width)
         ln = c.line._get_or_add_ln()
@@ -148,6 +157,7 @@ class Canvas:
             fb.add_line_segments(c[1:], close=True)
         sp = fb.convert_to_shape()
         sp.shadow.inherit = False
+        _drop_theme_style(sp)
         sp.fill.solid()
         sp.fill.fore_color.rgb = rgb(fill)
         if line:
@@ -180,6 +190,7 @@ class Canvas:
         """Native gradient overlay with transparency. Also composited into images below for QA."""
         sp = self.slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, x, y, w, h)
         sp.shadow.inherit = False
+        _drop_theme_style(sp)
         sp.line.fill.background()
         sp_pr = sp._element.spPr
         for tag in ("a:solidFill", "a:noFill", "a:gradFill"):

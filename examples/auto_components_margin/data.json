@@ -1,0 +1,595 @@
+{
+ "pnl": {
+  "periods": [
+   "FY22",
+   "FY23",
+   "FY24",
+   "FY25"
+  ],
+  "columns": {
+   "title": "Revenue, ₹ crore",
+   "values": [
+    4580,
+    5210,
+    5690,
+    6000
+   ],
+   "fmt": "num0"
+  },
+  "line": {
+   "title": "EBITDA margin, %",
+   "values": [
+    14.8,
+    13.1,
+    11.6,
+    10.9
+   ],
+   "fmt": "pct1"
+  },
+  "growth_label": "+{revenue_cagr} a year",
+  "change_label": "{margin_drop_bps_signed} bps"
+ },
+ "margin_bridge": {
+  "steps": [
+   {
+    "label": "FY22 margin",
+    "value": 14.8,
+    "kind": "total"
+   },
+   {
+    "label": "Raw material (net of pass-through)",
+    "value": -1.7
+   },
+   {
+    "label": "Product mix",
+    "value": -1.1
+   },
+   {
+    "label": "Conversion cost",
+    "value": -0.9
+   },
+   {
+    "label": "OEM price-downs",
+    "value": -0.6
+   },
+   {
+    "label": "Operating leverage",
+    "value": 0.8
+   },
+   {
+    "label": "SG&A",
+    "value": -0.4
+   },
+   {
+    "label": "FY25 margin",
+    "value": null,
+    "kind": "total"
+   }
+  ],
+  "fmt_total": "pct1",
+  "fmt_delta": "bps_from_pct",
+  "floor": 8.0,
+  "brackets": [
+   [
+    1,
+    2,
+    "{bridge_top2_bps_signed} bps, {bridge_top2_share} of the decline"
+   ]
+  ]
+ },
+ "product_pool": {
+  "segments": [
+   {
+    "name": "Hot forgings",
+    "size": 2160,
+    "rate": 15.5
+   },
+   {
+    "name": "Gears and shafts",
+    "size": 1200,
+    "rate": 12.0
+   },
+   {
+    "name": "Aluminium castings",
+    "size": 660,
+    "rate": 8.5
+   },
+   {
+    "name": "Machined components",
+    "size": 1980,
+    "rate": 6.0
+   }
+  ],
+  "fmt_rate": "pct1",
+  "fmt_profit": "inr_cr",
+  "average": [
+   10.9,
+   "Company average {margin_fy25}"
+  ],
+  "y_title": "EBITDA margin FY25, %",
+  "x_title": "Width = share of FY25 revenue (₹6,000 crore)"
+ },
+ "cost_benchmark": {
+  "ours_label": "Vardhan",
+  "peers_label": "Peers: eight listed Indian forging and machining companies, FY25 annual reports",
+  "kpis": [
+   {
+    "name": "Raw-material yield",
+    "unit": "% of input steel",
+    "ours": 82,
+    "lo": 79,
+    "q1": 84,
+    "median": 87,
+    "q3": 89,
+    "hi": 92,
+    "higher_is_better": true,
+    "fmt": "pct0"
+   },
+   {
+    "name": "Conversion cost",
+    "unit": "₹ per kg",
+    "ours": 59,
+    "lo": 41,
+    "q1": 46,
+    "median": 50,
+    "q3": 55,
+    "hi": 66,
+    "higher_is_better": false,
+    "fmt": "num0"
+   },
+   {
+    "name": "OEE",
+    "unit": "% of planned time",
+    "ours": 61,
+    "lo": 55,
+    "q1": 63,
+    "median": 68,
+    "q3": 74,
+    "hi": 81,
+    "higher_is_better": true,
+    "fmt": "pct0"
+   },
+   {
+    "name": "Labour productivity",
+    "unit": "tonnes per FTE per year",
+    "ours": 96,
+    "lo": 70,
+    "q1": 88,
+    "median": 102,
+    "q3": 118,
+    "hi": 135,
+    "higher_is_better": true,
+    "fmt": "num0"
+   },
+   {
+    "name": "Specific energy",
+    "unit": "kWh per kg",
+    "ours": 1.9,
+    "lo": 1.4,
+    "q1": 1.6,
+    "median": 1.8,
+    "q3": 2.0,
+    "hi": 2.3,
+    "higher_is_better": false,
+    "fmt": "num1"
+   },
+   {
+    "name": "SG&A",
+    "unit": "% of revenue",
+    "ours": 6.1,
+    "lo": 5.0,
+    "q1": 5.8,
+    "median": 6.5,
+    "q3": 7.4,
+    "hi": 8.8,
+    "higher_is_better": false,
+    "fmt": "pct1"
+   }
+  ]
+ },
+ "plants": {
+  "points": [
+   {
+    "label": "Pune",
+    "x": 52,
+    "y": 69,
+    "size": 18,
+    "note": "18 kt"
+   },
+   {
+    "label": "Chakan",
+    "x": 58,
+    "y": 63,
+    "size": 14,
+    "note": "14 kt"
+   },
+   {
+    "label": "Hosur",
+    "x": 66,
+    "y": 52,
+    "size": 16,
+    "note": "16 kt"
+   },
+   {
+    "label": "Rudrapur",
+    "x": 63,
+    "y": 55,
+    "size": 6,
+    "note": "6 kt"
+   },
+   {
+    "label": "Sanand",
+    "x": 71,
+    "y": 47,
+    "size": 9,
+    "note": "9 kt"
+   }
+  ],
+  "x_title": "OEE, % of planned time",
+  "y_title": "Conversion cost, ₹ per kg (lower is better, shown upward)",
+  "fmt_x": "pct0",
+  "fmt_y": "num0",
+  "x_ref": [
+   68,
+   "Peer median OEE"
+  ],
+  "y_ref": [
+   50,
+   "Peer median ₹50/kg"
+  ],
+  "domain_x": [
+   45,
+   80
+  ],
+  "domain_y": [
+   40,
+   75
+  ],
+  "invert_y": true,
+  "quadrants": {
+   "tr": "Best practice",
+   "bl": "Turnaround priority"
+  },
+  "shade": "bl",
+  "size_note": "Bubble area = annual output, kilotonnes",
+  "label_side": {
+   "Rudrapur": "t",
+   "Sanand": "r"
+  }
+ },
+ "pune_oee": {
+  "steps": [
+   {
+    "label": "Planned time",
+    "value": 100,
+    "kind": "total"
+   },
+   {
+    "label": "Changeovers",
+    "value": -16
+   },
+   {
+    "label": "Breakdowns",
+    "value": -12
+   },
+   {
+    "label": "Minor stops and speed loss",
+    "value": -11
+   },
+   {
+    "label": "Material and manpower waits",
+    "value": -6
+   },
+   {
+    "label": "Quality and rework",
+    "value": -3
+   },
+   {
+    "label": "OEE",
+    "value": null,
+    "kind": "total"
+   }
+  ],
+  "fmt_total": "pct0",
+  "fmt_delta": "num0",
+  "benchmark": [
+   80,
+   "Best-in-class forging line 80%"
+  ],
+  "changeover_min": 95,
+  "changeover_best": 30
+ },
+ "value_at_stake": {
+  "row_head": "EBITDA at stake, ₹ crore a year",
+  "rows": [
+   "OEE uplift (SMED, TPM)",
+   "Yield and scrap",
+   "Labour productivity",
+   "Energy",
+   "Maintenance and spares"
+  ],
+  "cols": [
+   "Pune",
+   "Chakan",
+   "Hosur",
+   "Rudrapur",
+   "Sanand"
+  ],
+  "values": [
+   [
+    22,
+    12,
+    5,
+    3,
+    2
+   ],
+   [
+    9,
+    7,
+    4,
+    2,
+    2
+   ],
+   [
+    8,
+    6,
+    3,
+    1,
+    1
+   ],
+   [
+    6,
+    4,
+    3,
+    1,
+    1
+   ],
+   [
+    4,
+    3,
+    2,
+    1,
+    1
+   ]
+  ],
+  "fmt": "num0",
+  "outline": [
+   [
+    0,
+    0
+   ],
+   [
+    0,
+    1
+   ]
+  ],
+  "commercial": {
+   "Raw-material index clauses": 54,
+   "Price and mix": 38
+  }
+ },
+ "levers": {
+  "points": [
+   {
+    "label": "Raw-material index clauses",
+    "x": 4.2,
+    "y": 54,
+    "size": 54,
+    "note": "₹54 cr"
+   },
+   {
+    "label": "OEE uplift",
+    "x": 3.3,
+    "y": 44,
+    "size": 44,
+    "note": "₹44 cr"
+   },
+   {
+    "label": "Price and mix",
+    "x": 1.8,
+    "y": 38,
+    "size": 38,
+    "note": "₹38 cr"
+   },
+   {
+    "label": "Yield and scrap",
+    "x": 3.6,
+    "y": 24,
+    "size": 24,
+    "note": "₹24 cr"
+   },
+   {
+    "label": "Labour productivity",
+    "x": 2.3,
+    "y": 19,
+    "size": 19,
+    "note": "₹19 cr"
+   },
+   {
+    "label": "Energy",
+    "x": 4.4,
+    "y": 15,
+    "size": 15,
+    "note": "₹15 cr"
+   },
+   {
+    "label": "Maintenance and spares",
+    "x": 4.7,
+    "y": 11,
+    "size": 11,
+    "note": "₹11 cr"
+   }
+  ],
+  "x_title": "Ease of capture (1 = hard, 5 = easy): capex, complexity, customer exposure",
+  "y_title": "EBITDA value, ₹ crore a year",
+  "fmt_x": "num0",
+  "fmt_y": "num0",
+  "x_ref": [
+   3.0,
+   ""
+  ],
+  "y_ref": [
+   30,
+   ""
+  ],
+  "domain_x": [
+   1,
+   5
+  ],
+  "domain_y": [
+   0,
+   60
+  ],
+  "size_note": "Bubble area = EBITDA value",
+  "label_side": {
+   "Maintenance and spares": "b",
+   "Energy": "l",
+   "Raw-material index clauses": "l"
+  }
+ },
+ "margin_walk": {
+  "steps": [
+   {
+    "label": "FY25 margin",
+    "value": 10.9,
+    "kind": "total"
+   },
+   {
+    "label": "Operating leverage",
+    "value": 0.6
+   },
+   {
+    "label": "Raw-material index clauses",
+    "value": 0.77
+   },
+   {
+    "label": "Price and mix",
+    "value": 0.54
+   },
+   {
+    "label": "OEE uplift",
+    "value": 0.63
+   },
+   {
+    "label": "Yield and scrap",
+    "value": 0.34
+   },
+   {
+    "label": "Labour productivity",
+    "value": 0.27
+   },
+   {
+    "label": "Energy",
+    "value": 0.21
+   },
+   {
+    "label": "Maintenance and spares",
+    "value": 0.16
+   },
+   {
+    "label": "FY27 margin",
+    "value": null,
+    "kind": "total"
+   }
+  ],
+  "fmt_total": "pct1",
+  "fmt_delta": "bps_from_pct",
+  "floor": 8.0,
+  "benchmark": [
+   15.0,
+   "Board target 15%"
+  ],
+  "fy27_revenue": 7000
+ },
+ "roadmap": {
+  "months": 24,
+  "waves": [
+   "Wave 1  Commercial quick wins",
+   "Wave 2  Plant turnarounds",
+   "Wave 3  Structural moves"
+  ],
+  "tasks": [
+   {
+    "name": "Index clauses in top ten OEM contracts",
+    "wave": 0,
+    "start": 0,
+    "end": 6,
+    "note": "₹54 cr"
+   },
+   {
+    "name": "Energy tariff and compressed air",
+    "wave": 0,
+    "start": 1,
+    "end": 7,
+    "note": "₹15 cr"
+   },
+   {
+    "name": "Spares rationalisation",
+    "wave": 0,
+    "start": 2,
+    "end": 8,
+    "note": "₹11 cr"
+   },
+   {
+    "name": "SMED and TPM at Pune and Chakan",
+    "wave": 1,
+    "start": 3,
+    "end": 15,
+    "note": "₹34 cr"
+   },
+   {
+    "name": "Yield and scrap, all plants",
+    "wave": 1,
+    "start": 4,
+    "end": 14,
+    "note": "₹24 cr"
+   },
+   {
+    "name": "Portfolio decision: machined components",
+    "wave": 2,
+    "start": 6,
+    "end": 9,
+    "note": "Board"
+   },
+   {
+    "name": "Reprice or exit low-margin SKUs",
+    "wave": 2,
+    "start": 9,
+    "end": 21,
+    "note": "₹38 cr"
+   },
+   {
+    "name": "Labour model and shift redesign",
+    "wave": 2,
+    "start": 9,
+    "end": 24,
+    "note": "₹19 cr"
+   },
+   {
+    "name": "OEE roll-out to three other plants",
+    "wave": 2,
+    "start": 12,
+    "end": 24,
+    "note": "₹10 cr"
+   }
+  ],
+  "milestones": [
+   [
+    6,
+    "{runrate_m6} run-rate"
+   ],
+   [
+    12,
+    "{runrate_m12} run-rate"
+   ],
+   [
+    24,
+    "{runrate_m24} run-rate"
+   ]
+  ]
+ },
+ "programme": {
+  "capex_cr": 28,
+  "tmo_months": 18
+ }
+}

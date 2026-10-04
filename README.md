@@ -7,7 +7,8 @@ DeckForge: brief in, consulting-grade editable PPTX out, with grounded numbers a
 ```bash
 pip install -e ".[dev]"
 sudo apt-get install -y libreoffice-impress fonts-liberation   # rendering and metric-compatible fonts
-python -m deckforge.demo.build_demo out/demo                    # builds a 10-slide demo deck, lints and repairs it
+python examples/auto_components_margin/build.py out/margin_recovery   # brief -> plan -> exhibits -> 13-slide board deck + plan report
+python -m deckforge.demo.build_demo out/demo                    # asset pipeline demo (backgrounds, icons, flags, map)
 pytest -q
 ```
 
@@ -17,7 +18,10 @@ pytest -q
 |---|---|
 | `deckforge/render/` | Canvas with placement records, font-metric text fitting, native charts with pinned plot areas, annotation overlays, layout furniture |
 | `deckforge/assets/` | Asset resolver: procedural backgrounds, open icons and flags, Natural Earth map shapes, stock photo APIs, local text-to-image client and reference GPU server, treatment (crop, grading, scrims) and image QA, provenance records |
+| `deckforge/story/` | Plan schema (problem, issue tree, analyses, storyline, slides), fact tokens, plan-to-deck renderer, plan report |
+| `deckforge/viz/` | Exhibit selector (message type + data shape, scored with reasons) and shape-built consulting exhibits: bridge, columns over line, profit pool, peer range benchmark, bubble and priority matrix, heat table, wave roadmap, numbered callouts and commentary |
 | `deckforge/qa/` | Geometry and legibility lint, deterministic repairs (backlights behind low-contrast text) |
+| `examples/` | Briefs run end to end. `auto_components_margin`: margin recovery board deck for a forging and machining company |
 | `deckforge/demo/` | Demo deck exercising every capability with illustrative data |
 
 ## Documents

@@ -1,0 +1,531 @@
+{
+ "brief_id": "auto_components_margin",
+ "produced_by": "Claude in-session, standing in for the planner model (no model endpoint in the build environment). Same schema the planner model fills.",
+ "problem": {
+  "key_question": "How can Vardhan restore EBITDA margin from 10.9% to at least 15% within 24 months without slowing growth?",
+  "decision_maker": "Board of directors, on the CEO's recommendation",
+  "success_criteria": [
+   "Margin of 15% or more by FY27",
+   "Revenue growth maintained",
+   "Plan funded within existing capex envelope"
+  ],
+  "scope": "All five plants and four product lines. Excludes M&A."
+ },
+ "issue_tree": {
+  "id": "Q0",
+  "question": "How can Vardhan restore EBITDA margin to 15% within 24 months?",
+  "children": [
+   {
+    "id": "Q1",
+    "question": "Why has margin fallen despite growth?",
+    "hypothesis": "Input-cost pass-through and mix, not volume",
+    "children": [
+     {
+      "id": "Q1.1",
+      "question": "Which P&L drivers explain the decline?"
+     },
+     {
+      "id": "Q1.2",
+      "question": "Is product mix diluting margin?"
+     }
+    ]
+   },
+   {
+    "id": "Q2",
+    "question": "How do we compare with peers, and where is the gap?",
+    "hypothesis": "Conversion cost and OEE, concentrated in two plants",
+    "children": [
+     {
+      "id": "Q2.1",
+      "question": "Which cost drivers lag the peer median?"
+     },
+     {
+      "id": "Q2.2",
+      "question": "Which plants drive the gap?"
+     }
+    ]
+   },
+   {
+    "id": "Q3",
+    "question": "How much can we recover, and from where?",
+    "hypothesis": "More than ₹200 crore, mostly plant operations plus contracts",
+    "children": [
+     {
+      "id": "Q3.1",
+      "question": "What causes the OEE loss at the worst plant?"
+     },
+     {
+      "id": "Q3.2",
+      "question": "What is the value at stake by lever and plant?"
+     }
+    ]
+   },
+   {
+    "id": "Q4",
+    "question": "What should we do first, and what margin does it deliver?",
+    "hypothesis": "Commercial quick wins first, plant turnarounds next, 15% needs a portfolio call",
+    "children": [
+     {
+      "id": "Q4.1",
+      "question": "Which levers come first?"
+     },
+     {
+      "id": "Q4.2",
+      "question": "What margin does the plan deliver?"
+     },
+     {
+      "id": "Q4.3",
+      "question": "How do we sequence it?"
+     }
+    ]
+   }
+  ]
+ },
+ "governing_thought": "Margin can recover to {fy27_margin} within 24 months through seven levers, and reach 15% with a portfolio decision on machined components",
+ "situation": "Revenue grew {revenue_growth_pct} from FY22 to FY25 on new EV and export programmes",
+ "complication": "EBITDA margin fell {margin_drop_bps} bps to {margin_fy25}, and we now trail peers on {kpis_worse} of six cost drivers",
+ "resolution": "Capture {value_at_stake} across seven levers in three waves and decide the future of machined components",
+ "sections": [
+  "Diagnosis",
+  "Benchmark",
+  "Potential",
+  "Plan"
+ ],
+ "analyses": [
+  {
+   "id": "A1",
+   "issue": "Q1",
+   "framework": "F062",
+   "name": "Growth versus profitability trend",
+   "message_type": "magnitude_and_rate_over_time",
+   "dataset": "pnl",
+   "data_status": "provided",
+   "why": "Establishes the complication: growth and margin moved in opposite directions"
+  },
+  {
+   "id": "A2",
+   "issue": "Q1.1",
+   "framework": "F051",
+   "name": "EBITDA margin bridge",
+   "message_type": "decomposition",
+   "dataset": "margin_bridge",
+   "data_status": "provided",
+   "why": "Splits the margin change into additive P&L drivers with signs"
+  },
+  {
+   "id": "A3",
+   "issue": "Q1.2",
+   "framework": "F014",
+   "name": "Profit pool by product line",
+   "message_type": "profit_by_segment",
+   "dataset": "product_pool",
+   "data_status": "provided",
+   "why": "Shows where revenue and profit sit at once, exposing mix dilution"
+  },
+  {
+   "id": "A4",
+   "issue": "Q2.1",
+   "framework": "F031",
+   "name": "Cost benchmarking against peers",
+   "message_type": "benchmark_vs_peers",
+   "dataset": "cost_benchmark",
+   "data_status": "provided",
+   "why": "Positions each cost driver within the peer distribution"
+  },
+  {
+   "id": "A5",
+   "issue": "Q2.2",
+   "framework": "F080",
+   "name": "Plant performance matrix",
+   "message_type": "portfolio",
+   "dataset": "plants",
+   "data_status": "provided",
+   "why": "Places plants on the two drivers with the largest gaps, sized by output"
+  },
+  {
+   "id": "A6",
+   "issue": "Q3.1",
+   "framework": "F075",
+   "name": "OEE loss tree, Pune",
+   "message_type": "decomposition",
+   "dataset": "pune_oee",
+   "data_status": "provided",
+   "why": "Decomposes lost time into the six big losses to target the fix"
+  },
+  {
+   "id": "A7",
+   "issue": "Q3.2",
+   "framework": "F111",
+   "name": "Value at stake by lever and plant",
+   "message_type": "value_by_two_dimensions",
+   "dataset": "value_at_stake",
+   "data_status": "provided",
+   "why": "Locates value across two dimensions so effort goes where value concentrates"
+  },
+  {
+   "id": "A8",
+   "issue": "Q4.1",
+   "framework": "F096",
+   "name": "Lever prioritisation",
+   "message_type": "prioritisation",
+   "dataset": "levers",
+   "data_status": "provided",
+   "why": "Trades value against ease to sequence levers"
+  },
+  {
+   "id": "A9",
+   "issue": "Q4.2",
+   "framework": "F070",
+   "name": "Margin walk to FY27",
+   "message_type": "decomposition",
+   "dataset": "margin_walk",
+   "data_status": "provided",
+   "why": "Shows what each lever adds and whether the target is met"
+  },
+  {
+   "id": "A10",
+   "issue": "Q4.3",
+   "framework": "F095",
+   "name": "Transformation roadmap",
+   "message_type": "schedule",
+   "dataset": "roadmap",
+   "data_status": "provided",
+   "why": "Sequences initiatives into waves with value milestones"
+  }
+ ],
+ "slides": [
+  {
+   "id": "S01",
+   "archetype": "cover",
+   "title": "Restoring EBITDA margin to 15%",
+   "subtitle": "Board discussion document  |  October 2026",
+   "notes": [
+    "Illustrative case. All company data is synthetic.",
+    "Prepared with DeckForge"
+   ]
+  },
+  {
+   "id": "S02",
+   "archetype": "exec_summary",
+   "title": "Margin can recover to {fy27_margin} within 24 months through seven levers, and reach 15% with a portfolio decision",
+   "source": "Source: DeckForge analysis",
+   "rows": [
+    {
+     "label": "Diagnosis",
+     "lead": "Margin fell {margin_drop_bps} bps in three years",
+     "text": "while revenue grew {revenue_growth_pct}. Raw-material pass-through lag and a mix shift to machined components explain {bridge_top2_bps} bps of the decline."
+    },
+    {
+     "label": "Benchmark",
+     "lead": "We trail the peer median on {kpis_worse} of six cost drivers,",
+     "text": "most on conversion cost ({conv_gap_pct} against median) and OEE. Pune and Chakan account for {plant_gap_share} of the conversion-cost gap."
+    },
+    {
+     "label": "Potential",
+     "lead": "{value_at_stake} of annual EBITDA is at stake",
+     "text": "across seven levers: {ops_value} in plant operations, {pune_chakan_share} of it at Pune and Chakan, and {commercial_value} in contracts, price and mix."
+    },
+    {
+     "label": "Plan",
+     "lead": "Three waves lift margin to {fy27_margin} by FY27.",
+     "text": "Closing the last {target_gap_bps} bps to 15% requires a decision on the machined-components portfolio."
+    }
+   ]
+  },
+  {
+   "id": "S03",
+   "archetype": "exhibit",
+   "section": 0,
+   "analysis": "A1",
+   "title": "Revenue grew {revenue_growth_pct} since FY22, but EBITDA margin fell {margin_drop_bps} bps to {margin_fy25}",
+   "exhibit_title": "Revenue and EBITDA margin, FY22 to FY25",
+   "sticker": "ILLUSTRATIVE",
+   "source": "Source: company financials FY22 to FY25; plant MIS; DeckForge analysis",
+   "commentary_head": "What happened",
+   "points": [
+    {
+     "lead": "Volume-led growth",
+     "text": "from new EV and export programmes, while annual OEM price-downs eroded realisation.",
+     "target": "col:3"
+    },
+    {
+     "lead": "The steepest fall came in FY23,",
+     "text": "when steel prices rose and contracts had no index clauses to pass them on.",
+     "target": "line:1"
+    },
+    {
+     "lead": "Scale did not protect margin:",
+     "text": "fixed-cost absorption improved, but less than input costs and mix worsened."
+    }
+   ]
+  },
+  {
+   "id": "S04",
+   "archetype": "exhibit",
+   "section": 0,
+   "analysis": "A2",
+   "title": "Raw-material lag and adverse mix explain {bridge_top2_bps} of the {margin_drop_bps} bps margin decline",
+   "exhibit_title": "EBITDA margin bridge, FY22 to FY25",
+   "exhibit_unit": "% of revenue, changes in bps",
+   "emphasis": [
+    1,
+    2
+   ],
+   "sticker": "ILLUSTRATIVE",
+   "source": "Source: company financials FY22 to FY25; plant MIS; DeckForge analysis",
+   "commentary_head": "What drove the decline",
+   "points": [
+    {
+     "lead": "Pass-through lag:",
+     "text": "steel price rises reached OEM prices two quarters late, because contracts lack index clauses.",
+     "target": 1
+    },
+    {
+     "lead": "Mix shift:",
+     "text": "machined components grew from {machined_share_fy22} to {machined_share_fy25} of revenue at less than half the forging margin.",
+     "target": 2
+    },
+    {
+     "lead": "Operating leverage",
+     "text": "added back {op_leverage_bps} bps on volume growth, not enough to offset the rest.",
+     "target": 5
+    }
+   ]
+  },
+  {
+   "id": "S05",
+   "archetype": "exhibit",
+   "section": 0,
+   "analysis": "A3",
+   "title": "Machined components are {machined_share_fy25} of revenue but earn {machined_margin}, less than half the forging margin",
+   "exhibit_title": "Profit pool by product line, FY25",
+   "exhibit_unit": "EBITDA margin by revenue share",
+   "emphasis": [
+    "Machined components"
+   ],
+   "sticker": "ILLUSTRATIVE",
+   "source": "Source: company financials FY22 to FY25; plant MIS; DeckForge analysis",
+   "commentary_head": "Implications",
+   "points": [
+    {
+     "lead": "Machined components earn {machined_ebitda}",
+     "text": "on {machined_revenue} of revenue, the largest revenue line after forgings but the smallest profit pool per rupee.",
+     "target": "Machined components"
+    },
+    {
+     "lead": "Every point of mix",
+     "text": "moved from forgings to machining costs about {mix_cost_per_pp} bps of company margin."
+    },
+    {
+     "lead": "Fix, reprice or exit:",
+     "text": "the portfolio question the board needs to answer."
+    }
+   ]
+  },
+  {
+   "id": "S06",
+   "archetype": "exhibit",
+   "section": 1,
+   "analysis": "A4",
+   "title": "We trail the peer median on {kpis_worse} of six cost drivers, most on conversion cost and OEE",
+   "exhibit_title": "Cost drivers against eight listed peers, FY25",
+   "sticker": "ILLUSTRATIVE",
+   "source": "Source: peer annual reports FY25; company data; DeckForge analysis"
+  },
+  {
+   "id": "S07",
+   "archetype": "exhibit",
+   "section": 1,
+   "analysis": "A5",
+   "title": "Pune and Chakan account for {plant_gap_share} of the conversion-cost gap to the peer median",
+   "exhibit_title": "Plant performance, FY25",
+   "emphasis": [
+    "Pune",
+    "Chakan"
+   ],
+   "sticker": "ILLUSTRATIVE",
+   "source": "Source: company financials FY22 to FY25; plant MIS; DeckForge analysis",
+   "commentary_head": "Where the gap sits",
+   "points": [
+    {
+     "lead": "Pune:",
+     "text": "{pune_gap} a year above peer-median cost, on the lowest OEE in the network.",
+     "target": "Pune"
+    },
+    {
+     "lead": "Chakan:",
+     "text": "{chakan_gap} a year, similar loss pattern at smaller scale.",
+     "target": "Chakan"
+    },
+    {
+     "lead": "Sanand shows it can be done:",
+     "text": "already better than the peer median on both measures.",
+     "target": "Sanand"
+    }
+   ]
+  },
+  {
+   "id": "S08",
+   "archetype": "exhibit",
+   "section": 2,
+   "analysis": "A6",
+   "title": "Changeovers and breakdowns cost Pune {oee_top2} OEE points, {oee_gap_phrase}",
+   "exhibit_title": "OEE loss tree, Pune forging lines, FY25",
+   "exhibit_unit": "% of planned time",
+   "emphasis": [
+    1,
+    2
+   ],
+   "sticker": "ILLUSTRATIVE",
+   "source": "Source: Pune plant loss data FY25; DeckForge analysis",
+   "commentary_head": "How to recover it",
+   "points": [
+    {
+     "lead": "SMED",
+     "text": "on the three press lines: changeovers average {changeover_min} minutes against {changeover_best} at best practice.",
+     "target": 1
+    },
+    {
+     "lead": "TPM",
+     "text": "on the furnaces and presses, where breakdowns cluster in a handful of assets.",
+     "target": 2
+    },
+    {
+     "lead": "Target:",
+     "text": "recover two thirds of these losses within a year."
+    }
+   ]
+  },
+  {
+   "id": "S09",
+   "archetype": "exhibit",
+   "section": 2,
+   "analysis": "A7",
+   "title": "{ops_value} of plant EBITDA is at stake, {pune_chakan_share} of it at Pune and Chakan",
+   "exhibit_title": "Operational value at stake by lever and plant",
+   "exhibit_unit": "₹ crore EBITDA a year at full run-rate",
+   "sticker": "ILLUSTRATIVE",
+   "source": "Source: operations team lever estimates; DeckForge analysis",
+   "notes": [
+    "Note: commercial levers (raw-material index clauses {rm_value}, price and mix {pm_value}) are company-wide and shown on the next page"
+   ],
+   "commentary_head": "Reading the map",
+   "points": [
+    {
+     "lead": "OEE is the largest lever,",
+     "text": "{oee_value} a year, and two thirds of it sits in two plants."
+    },
+    {
+     "lead": "Smaller plants",
+     "text": "carry little value: roll out the playbook, not a full programme."
+    },
+    {
+     "lead": "Commercial levers add {commercial_value},",
+     "text": "bringing the total prize to {value_at_stake}."
+    }
+   ]
+  },
+  {
+   "id": "S10",
+   "archetype": "exhibit",
+   "section": 3,
+   "analysis": "A8",
+   "title": "Index clauses and OEE are the quick wins, together {quick_win_value} of the {value_at_stake} prize",
+   "exhibit_title": "Lever prioritisation",
+   "emphasis": [
+    "Raw-material index clauses",
+    "OEE uplift"
+   ],
+   "sticker": "ILLUSTRATIVE",
+   "source": "Source: operations and commercial team estimates; DeckForge analysis",
+   "commentary_head": "Sequencing logic",
+   "points": [
+    {
+     "lead": "Start with contracts:",
+     "text": "index clauses need no capex and protect every future steel cycle.",
+     "target": "Raw-material index clauses"
+    },
+    {
+     "lead": "Price and mix is large but hard:",
+     "text": "it touches OEM relationships and needs the portfolio decision first.",
+     "target": "Price and mix"
+    },
+    {
+     "lead": "Bundle the fill-ins",
+     "text": "(energy, spares, yield) into the plant programmes."
+    }
+   ]
+  },
+  {
+   "id": "S11",
+   "archetype": "exhibit",
+   "section": 3,
+   "analysis": "A9",
+   "title": "Seven levers lift margin to {fy27_margin} by FY27, {target_gap_bps} bps short of the 15% target",
+   "exhibit_title": "EBITDA margin walk, FY25 to FY27",
+   "exhibit_unit": "% of revenue, changes in bps",
+   "emphasis": [
+    2,
+    4
+   ],
+   "sticker": "ILLUSTRATIVE",
+   "source": "Source: DeckForge analysis",
+   "notes": [
+    "Note: FY27 revenue assumed at ₹{fy27_revenue} crore; lever values at full run-rate"
+   ],
+   "commentary_head": "Closing the gap",
+   "points": [
+    {
+     "lead": "Contracts and OEE",
+     "text": "deliver {walk_contracts_oee_bps} bps between them, more than half of the uplift.",
+     "target": 4
+    },
+    {
+     "lead": "The last {target_gap_bps} bps",
+     "text": "depends on fixing or exiting the lowest-margin machined SKUs."
+    }
+   ]
+  },
+  {
+   "id": "S12",
+   "archetype": "exhibit",
+   "section": 3,
+   "analysis": "A10",
+   "title": "Three waves reach {runrate_m12} run-rate within a year and the full {value_at_stake} by month 24",
+   "exhibit_title": "Transformation roadmap",
+   "exhibit_unit": "months from board approval, EBITDA at full run-rate",
+   "sticker": "ILLUSTRATIVE",
+   "source": "Source: DeckForge analysis"
+  },
+  {
+   "id": "S13",
+   "archetype": "decisions",
+   "section": 3,
+   "title": "We ask the board for three decisions today",
+   "source": "",
+   "rows": [
+    {
+     "label": "Approve",
+     "lead": "Raw-material index clauses",
+     "text": "as a required term in the top ten OEM contracts at the next renewal.",
+     "owner": "CEO and CFO",
+     "when": "From Q4 FY26"
+    },
+    {
+     "label": "Fund",
+     "lead": "The Pune and Chakan turnaround,",
+     "text": "{programme_capex} of capex plus a dedicated transformation office for {tmo_months} months.",
+     "owner": "COO",
+     "when": "Start M0"
+    },
+    {
+     "label": "Commission",
+     "lead": "A portfolio review of machined components",
+     "text": "to fix, reprice or exit by month 9, worth about {target_gap_bps} bps of margin.",
+     "owner": "CEO, Strategy",
+     "when": "Decision by M9"
+    }
+   ]
+  }
+ ]
+}

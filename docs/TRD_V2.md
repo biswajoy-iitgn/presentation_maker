@@ -313,6 +313,10 @@ T3 additions from corpus review: isometric bars and composition blocks (keynote 
 
 **Evidence:** `spikes/visual_proof/` rebuilt Bain and McKinsey benchmark slides as native objects with computed overlays at near-parity, and its geometry lint caught two real layout collisions on first run.
 
+### 7.3a Implementation status
+
+Consulting exhibits are now shape-built by default (`deckforge/viz/exhibits/`), because native chart rendering cannot place labels, brackets, benchmarks and callouts with the control top-firm exhibits need. Native charts remain available (`deckforge/render/charts.py`) where in-PowerPoint data editing matters more than craft. Each exhibit is selected by `deckforge/viz/select.py` from the analysis message type and the data profile, and the plan report records every candidate with its score and reasons.
+
 ### 7.4 Chart rules (deterministic, used by compiler and chart gate)
 
 | # | Rule |

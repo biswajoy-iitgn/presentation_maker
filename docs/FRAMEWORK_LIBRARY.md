@@ -102,6 +102,7 @@ Columns: **Q** = question it answers. **Data** = minimum data. **Visual** = cano
 | F058 | Business case (NPV, IRR, payback) | Is the investment worth it? | Cash flows, discount rate | Cash-flow columns with cumulative line, KPI row [business_case] | Discount rate unstated |
 | F059 | Unit economics (CAC, LTV) | Does each customer make money? | Acquisition cost, margin, churn | Unit waterfall, LTV/CAC KPI [waterfall] | Gross vs contribution margin confusion |
 | F060 | Working capital (DSO, DIO, DPO) | Is cash trapped? | Receivables, inventory, payables | Cash conversion cycle bars vs peers [ranked_bar] | Seasonal distortion |
+| F062 | Growth versus profitability trend | Did growth come with or at the expense of margin? | Revenue and margin over time | Columns over line on one period axis, never dual axis [columns_over_line] | Dual-axis charts, mismatched periods |
 | F061 | Capital allocation | Where did cash go? | Sources and uses | Sources-and-uses waterfall [waterfall] | Double counting |
 
 ### 2.5 Operations and cost
@@ -117,6 +118,7 @@ Columns: **Q** = question it answers. **Data** = minimum data. **Visual** = cano
 | F076 | Capacity utilisation | Do we have enough capacity? | Capacity and demand by site and period | Bars with capacity line [column_with_line] | Theoretical vs practical capacity |
 | F077 | Make vs buy | Should we outsource? | Internal cost, external price, strategic fit | Cost comparison plus criteria table [options_table] | Ignoring transition cost |
 | F078 | Footprint optimisation | Where should facilities be? | Sites, demand, cost | Map with sites and flows [map_callouts] | Static view of dynamic demand |
+| F080 | Plant performance matrix | Which plants drive the cost gap? | Two performance measures and output per plant | Bubble matrix with peer-median reference lines [bubble_matrix] | Unweighted averages, plants on different product mixes |
 | F079 | Marginal abatement cost curve | Which abatement levers are cheapest? | Lever cost per tonne and volume | Variable-width bar curve [mac_curve] | Negative-cost levers without evidence |
 
 ### 2.6 Organisation and transformation
