@@ -8,7 +8,14 @@ Library versions: `langgraph==1.2.*`, `langchain==1.4.*`, `langchain-core==1.6.*
 |---|---|---|
 | LangGraph | The deck pipeline as a durable state machine: nodes, conditional edges, parallel fan-out (`Send`), human-in-the-loop (`interrupt`), retries (`RetryPolicy`), node caching (`CachePolicy`), checkpoints, streaming, long-term memory (`Store`) | Business logic inside graph wiring code |
 | LangChain core | `BaseChatModel` interface, `ChatPromptTemplate`, messages, `with_structured_output`, `StructuredTool`, embeddings interface | Legacy chains or `AgentExecutor` |
-| LangChain `create_agent` + middleware | Only the research sub-agent, which needs open-ended tool use. Middleware: our `LayaToolSelectorMiddleware`, `ToolRetryMiddleware`, `ToolCallLimitMiddleware`, `ModelCallLimitMiddleware`, `SummarizationMiddleware`, `ContextEditingMiddleware` | The main pipeline (it is a fixed graph, not an agent loop) |
+| LangChain `create_agent` + middleware | Only the two ReAct agents (`researcher`, and `supervisor` in revision mode), which need open-ended tool use (`20`, section 4). Middleware: our `LayaToolSelectorMiddleware`, `ToolRetryMiddleware`, `ToolCallLimitMiddleware`, `ModelCallLimitMiddleware`, `SummarizationMiddleware`, `ContextEditingMiddleware` | The main pipeline (it is a fixed graph, not an agent loop) |
+
+### 1.1 How this document relates to the agent docs
+
+This document defines the graph mechanics: state, nodes, edges, retries, interrupts, streaming and the job runner. The agent layer (`20`) and the agent protocol (`27`) sit on top of it:
+- Each agent in `20` is a subgraph or a `create_agent` instance invoked from a node of `deck_graph`. The node names below map to agents as follows: `intake` = intake_analyst, `planning` = engagement_manager, `bind_data` and `compute_facts` = data_analyst, `research_agent` = researcher, `slide_composer` = viz_designer then copywriter then art_director, `qa` = fact_checker and reviewer.
+- The graph itself is the orchestrator. It sends `TASK` envelopes and receives `RESULT`, `REJECT`, `NEED`, `ESCALATE` and `REPORT` (`27`, section 2). In-process this is a function call with the envelope as argument, so the protocol adds no network hop.
+- The `repair` node of earlier drafts is replaced by the `qa_router` node (`27`, section 8.3), which routes each finding to the agent that owns the faulty artefact.
 
 ## 2. Graph inventory
 
@@ -19,7 +26,9 @@ Library versions: `langgraph==1.2.*`, `langchain==1.4.*`, `langchain-core==1.6.*
 | `planning` (subgraph) | `deckforge/graphs/planning.py` | node in `deck_graph` | Problem, issue tree, analyses, storyline, slide plan |
 | `research_agent` | `deckforge/graphs/research.py` | `Send` per analysis needing external data | `create_agent` with Laya tool selection |
 | `slide_composer` (subgraph) | `deckforge/graphs/compose.py` | `Send` per slide | Exhibit choice, exhibit data, title and commentary, assets |
-| `qa_repair` (subgraph) | `deckforge/graphs/qa.py` | node in `deck_graph` | Evaluator cascade, repair routing |
+| `qa` (subgraph) | `deckforge/graphs/qa.py` | node in `deck_graph` | Evaluator cascade and visual inspector (`09` section 6, `25`), returns `QAVerdict` |
+| `qa_router` | `deckforge/graphs/qa_router.py` | node in `deck_graph` | Owner and strategy per finding, repair `TASK`s to owner agents, redo of dependants (`27`, section 8) |
+| `revision_graph` | `deckforge/graphs/revision.py` | `run.revise` job | W2: supervisor `RevisionPlan`, owner task, redo, render, incremental QA (`20`, W2) |
 | `slide_regen_graph` | `deckforge/graphs/regen.py` | `slide.regenerate` job | Recompose one slide with a user instruction, re-render, re-QA |
 | `template_ingest_graph` | `deckforge/graphs/template.py` | `template.ingest` job | PPTX/POTX to `DesignSystem` (deterministic plus one LLM naming step) |
 
@@ -81,7 +90,7 @@ class DeckState(TypedDict, total=False):
 ```
 
 Subgraph state rules:
-- `intake`, `planning` and `qa_repair` use `DeckState` directly (they run once, on the whole deck).
+- `intake`, `planning`, `qa` and `qa_router` use `DeckState` directly (they run once, on the whole deck).
 - `slide_composer` runs once per slide through `Send`. It is built as `StateGraph(ComposeState, context_schema=GraphContext, input_schema=ComposeInput, output_schema=ComposeOutput)`. `ComposeInput` holds the slide plan item, brief, design system, facts and the one dataset it needs. `ComposeOutput` declares only `slides`, `asset_keys`, `decision_log_ids` and `warnings` (with the same reducers as `DeckState`), so a branch never writes back facts or exhibit data it only read.
 - `research_agent_node` is a plain async node that receives one analysis from `Send`, gets a compiled agent from `runtime.context` (cached per org model profile, because the model depends on the org) and returns only `findings`, `citations`, `decision_log_ids` and `warnings`.
 
@@ -143,9 +152,9 @@ flowchart TD
   FANOUT --> COMPOSE[slide_composer x slides via Send]
   COMPOSE --> ASSEMBLE[assemble_plan]
   ASSEMBLE --> RENDER[render_deck]
-  RENDER --> QA[qa_repair subgraph]
+  RENDER --> QA[qa subgraph: fact_checker, reviewer, inspector]
   QA --> FIX{blockers left and repair_round < max?}
-  FIX -- yes --> REPAIR[repair router]
+  FIX -- yes --> REPAIR[qa_router: repair TASKs to owner agents, redo dependants]
   REPAIR --> RENDER
   FIX -- no --> FINAL[finalize]
   FINAL --> E([END])
@@ -176,8 +185,8 @@ Types: D = deterministic code, L = LLM, Y = Laya decision, T = tool call, H = hu
 | `slide_composer` | D + Y + L (writer) + T | one slide plan item, facts, exhibit_data | slides[id], asset_keys | 3 | no | 180 s | slide.composed |
 | `assemble_plan` | D | plan, slides | plan.slides (composed, ordered) | 1 | no | 10 s | |
 | `render_deck` | D + T (renderer) | plan, exhibit_data, facts, design_system | deck_version, deck_key, preview_keys | 2 | no | 180 s | slide.rendered, artifact.ready |
-| `qa_repair.*` | D + Y + L + VLM | deck, plan | defects, qa | 2 | per judge | 240 s | qa.defect |
-| `repair` | D + L (writer) | defects | slides, exhibit_data, repair_round | 2 | no | 180 s | |
+| `qa.*` | D + Y + L + VLM | deck, plan | defects, qa | 2 | per judge | 240 s | qa.defect |
+| `qa_router` | D + Y, then owner agents (L) | defects, artefact provenance | new artefact versions, repair_round, agent_messages | 2 | no | 180 s | qa.repair |
 | `finalize` | D | everything | artifacts, run status | 3 | no | 60 s | run.status |
 
 ### 5.2 Edges in code
@@ -193,7 +202,7 @@ from deckforge.graphs.state import DeckState
 from deckforge.graphs.intake import build_intake
 from deckforge.graphs.planning import build_planning
 from deckforge.graphs.compose import build_slide_composer
-from deckforge.graphs.qa import build_qa_repair
+from deckforge.graphs.qa import build_qa
 from deckforge.graphs.research import build_research_agent
 
 GRAPH_VERSION = "deck-1"          # bump when node names, state keys or edges change (section 9)
@@ -228,8 +237,8 @@ def build_deck_graph() -> StateGraph:
     g.add_node("slide_composer", build_slide_composer().compile(), retry_policy=LLM_RETRY)
     g.add_node("assemble_plan", n.assemble_plan)
     g.add_node("render_deck", n.render_deck, retry_policy=IO_RETRY)
-    g.add_node("qa_repair", build_qa_repair().compile())
-    g.add_node("repair", n.repair, retry_policy=LLM_RETRY)
+    g.add_node("qa", build_qa().compile())
+    g.add_node("qa_router", n.qa_router, retry_policy=LLM_RETRY)      # 27, section 8.3
     g.add_node("finalize", n.finalize, retry_policy=IO_RETRY)
 
     g.add_edge(START, "intake")
@@ -244,9 +253,9 @@ def build_deck_graph() -> StateGraph:
     g.add_conditional_edges("fan_out_slides", fan_out_slides, ["slide_composer"])
     g.add_edge("slide_composer", "assemble_plan")
     g.add_edge("assemble_plan", "render_deck")
-    g.add_edge("render_deck", "qa_repair")
-    g.add_conditional_edges("qa_repair", n.route_after_qa, ["repair", "finalize"])
-    g.add_edge("repair", "render_deck")
+    g.add_edge("render_deck", "qa")
+    g.add_conditional_edges("qa", n.route_after_qa, ["qa_router", "finalize"])
+    g.add_edge("qa_router", "render_deck")
     g.add_edge("finalize", END)
     return g
 ```
@@ -257,7 +266,7 @@ Route functions are pure and unit-tested:
 def route_after_qa(state: DeckState) -> str:
     blockers = [d for d in state["defects"] if d.severity == "blocker" and d.status == "open"]
     if blockers and state.get("repair_round", 0) < state["options"].max_repair_rounds:
-        return "repair"
+        return "qa_router"            # was "repair". Majors also route here when D_REPAIR_STOP says continue (27, section 8.4)
     return "finalize"
 ```
 
@@ -327,7 +336,9 @@ flowchart LR
 - `check_copy` (D + Y): `resolve()` must succeed, `untracked_numbers()` must be empty except allowed brief numbers, title length at or under 2 lines at the design system title size (metrics), Laya `J_ACTION_TITLE` and `J_TITLE_SUPPORTED` above threshold, else rewrite with the judge evidence.
 - `pick_assets` (T): icon search (embedding shortlist over the Lucide index, then Laya `D_ICON_PICK` when more than one fits), band or panel imagery through the existing asset resolver.
 
-**qa_repair**: see `09` section 6. Output: `defects`, `qa`.
+**qa**: see `09` section 6 and `25`. Output: `defects`, `qa`.
+
+**qa_router**: see `27` section 8.3. Output: new artefact versions from owner agents, `repair_round`.
 
 **research_agent**: see `08` section 6.
 
@@ -413,7 +424,7 @@ Concurrency limits:
 - Per worker process: `DF_WORKER_SLOTS` concurrent jobs.
 - Per run: `max_concurrency` in the config limits parallel `Send` branches (slides, research).
 - Per org: queue admission (lease query skips orgs at `DF_ORG_MAX_ACTIVE_RUNS`).
-- Per provider: the LLM layer holds an `asyncio.Semaphore` per role and the gateway enforces rpm/tpm.
+- Per model pool: `ModelPool` holds a cluster-wide token budget semaphore in Valkey (Lua) per pool and priority class, with adaptive concurrency from vLLM queue metrics (`22`, section 6). There is no external gateway.
 
 ## 8. Queue SQL (server)
 

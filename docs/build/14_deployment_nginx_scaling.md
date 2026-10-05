@@ -27,12 +27,12 @@ Reference: one CPU host and one GPU host on a private network. A single host wit
 deploy/compose/
 ├── docker-compose.yml
 ├── .env.server.example          # copy to .env and fill secrets
-├── secrets/                     # created by `deckforge secrets init`: jwt, secrets_key, laya_key, litellm_master_key, postgres_password
+├── secrets/                     # created by `deckforge secrets init`: jwt, secrets_key, laya_key, pool_key, clm_key, postgres_password
 deploy/nginx/
 ├── nginx.conf
 ├── conf.d/deckforge.conf
 └── snippets/security_headers.conf, proxy_headers.conf
-deploy/litellm/config.yaml
+config/model_pools.yaml           # replicas, adapters, budgets (22, section 6.1)
 ```
 
 ### 2.2 `docker-compose.yml`
@@ -49,11 +49,14 @@ x-app-env: &app-env
   DF_LAYA_MODE: http
   DF_LAYA_URL: http://laya:8200
   DF_RENDERER_URL: http://renderer:8100
-  DF_LLM_GATEWAY_URL: http://litellm:4000/v1
+  DF_MODEL_POOLS_FILE: /app/config/model_pools.yaml
+  DF_CLM_URL: http://clm:8700
+  DF_LAYA_VISION_URL: http://laya-vision:8210
   DF_JWT_SECRET_FILE: /run/secrets/jwt
   DF_SECRETS_KEY_FILE: /run/secrets/secrets_key
   DF_LAYA_API_KEY_FILE: /run/secrets/laya_key
-  DF_LLM_GATEWAY_KEY_FILE: /run/secrets/litellm_key
+  DF_POOL_API_KEY_FILE: /run/secrets/pool_key
+  DF_CLM_API_KEY_FILE: /run/secrets/clm_key
 
 x-app: &app
   image: ghcr.io/deckforge/deckforge:${DF_VERSION}
@@ -61,7 +64,7 @@ x-app: &app
   environment: *app-env
   volumes:
     - blobs:/data/blobs
-  secrets: [jwt, secrets_key, laya_key, litellm_key]
+  secrets: [jwt, secrets_key, laya_key, pool_key, clm_key]
   restart: unless-stopped
   depends_on:
     postgres: {condition: service_healthy}
@@ -112,39 +115,106 @@ services:
     tmpfs: [/tmp]
     restart: unless-stopped
 
-  laya:
-    image: ghcr.io/deckforge/deckforge-laya:${DF_VERSION}
-    profiles: ["laya"]
-    environment:
-      LAYA_DEVICE: ${LAYA_DEVICE:-cpu}
-      LAYA_THREADS: "8"
-      LAYA_PRELOAD: "1"
-      LAYA_MAX_LOADED: "3"
-      LAYA_MODELS: ${LAYA_MODELS:-/models/df-laya-active,convaiinnovations/laya}
-      HF_HUB_OFFLINE: "1"
-      HF_HUB_CACHE: /models/hf
-    secrets: [laya_key]          # entrypoint exports LAYA_API_KEY from /run/secrets/laya_key
-    volumes: [laya_models:/models:ro]
-    restart: unless-stopped
-
-  litellm:
-    image: ghcr.io/berriai/litellm:${LITELLM_TAG}
-    profiles: ["llm"]
-    entrypoint: ["sh", "-c", "export LITELLM_MASTER_KEY=$$(cat /run/secrets/litellm_key) && exec litellm --config /app/config.yaml --port 4000"]
-    volumes: [../litellm/config.yaml:/app/config.yaml:ro]
-    environment:
-      DATABASE_URL: postgresql://deckforge:${POSTGRES_PASSWORD}@postgres:5432/litellm
-    secrets: [litellm_key]
-    restart: unless-stopped
-
-  vllm:
+  # GPU services. Device ids follow the daytime allocation in 22, section 4.1
+  vllm-lm-a:
     image: vllm/vllm-openai:${VLLM_TAG}
     profiles: ["gpu"]
-    command: ["--model", "${PLANNER_MODEL_PATH}", "--served-model-name", "planner-main",
-              "--enable-prefix-caching", "--max-model-len", "65536", "--tensor-parallel-size", "${TP:-4}",
-              "--gpu-memory-utilization", "0.88"]
+    entrypoint: ["/bin/sh", "-c", "export VLLM_API_KEY=$$(cat /run/secrets/pool_key) && exec vllm serve \"$$@\"", "--"]
+    command: ["/models/df-lm-32b-fp8", "--served-model-name", "df-lm",
+              "--tensor-parallel-size", "2", "--gpu-memory-utilization", "0.90", "--kv-cache-dtype", "fp8",
+              "--max-model-len", "32768", "--max-num-seqs", "64", "--max-num-batched-tokens", "16384",
+              "--enable-prefix-caching", "--enable-lora", "--max-loras", "8", "--max-lora-rank", "16", "--max-cpu-loras", "16",
+              "--lora-modules", "df-planner=/models/adapters/df-planner", "df-writer=/models/adapters/df-writer",
+              "df-viz=/models/adapters/df-viz", "df-art=/models/adapters/df-art", "df-intake=/models/adapters/df-intake",
+              "df-analyst=/models/adapters/df-analyst", "df-researcher=/models/adapters/df-researcher",
+              "df-reviewer=/models/adapters/df-reviewer", "df-repair=/models/adapters/df-repair",
+              "df-supervisor=/models/adapters/df-supervisor",
+              "--enable-auto-tool-choice", "--tool-call-parser", "hermes"]
     volumes: [models:/models:ro]
-    deploy: {resources: {reservations: {devices: [{driver: nvidia, count: all, capabilities: [gpu]}]}}}
+    secrets: [pool_key]
+    ipc: host
+    deploy: {resources: {reservations: {devices: [{driver: nvidia, device_ids: ["0", "1"], capabilities: [gpu]}]}}}
+    restart: unless-stopped
+
+  vllm-lm-b:                      # second replica, sleeps at night for training (22, section 4.2)
+    image: vllm/vllm-openai:${VLLM_TAG}
+    profiles: ["gpu"]
+    entrypoint: ["/bin/sh", "-c", "export VLLM_API_KEY=$$(cat /run/secrets/pool_key) && exec vllm serve \"$$@\"", "--"]
+    command: ["/models/df-lm-32b-fp8", "--served-model-name", "df-lm",
+              "--tensor-parallel-size", "1", "--gpu-memory-utilization", "0.90", "--kv-cache-dtype", "fp8",
+              "--max-model-len", "32768", "--max-num-seqs", "24", "--enable-prefix-caching", "--enable-sleep-mode",
+              "--enable-lora", "--max-loras", "8", "--max-lora-rank", "16", "--max-cpu-loras", "16",
+              "--lora-modules", "df-planner=/models/adapters/df-planner", "df-writer=/models/adapters/df-writer",
+              "df-viz=/models/adapters/df-viz", "df-art=/models/adapters/df-art", "df-intake=/models/adapters/df-intake",
+              "df-analyst=/models/adapters/df-analyst", "df-researcher=/models/adapters/df-researcher",
+              "df-reviewer=/models/adapters/df-reviewer", "df-repair=/models/adapters/df-repair",
+              "df-supervisor=/models/adapters/df-supervisor",
+              "--enable-auto-tool-choice", "--tool-call-parser", "hermes"]
+    environment: {VLLM_SERVER_DEV_MODE: "1"}     # exposes /sleep and /wake_up, internal network only
+    volumes: [models:/models:ro]
+    secrets: [pool_key]
+    ipc: host
+    deploy: {resources: {reservations: {devices: [{driver: nvidia, device_ids: ["2"], capabilities: [gpu]}]}}}
+    restart: unless-stopped
+
+  laya:                           # started before vllm services on GPU 3 (vLLM measures free memory at start)
+    image: ghcr.io/deckforge/deckforge-laya:${DF_VERSION}
+    profiles: ["gpu"]
+    environment:
+      LAYA_DEVICE: cuda
+      LAYA_PRELOAD: "1"
+      LAYA_MAX_LOADED: "2"
+      LAYA_MODELS: /models/df-laya-active,/models/laya-base
+      HF_HUB_OFFLINE: "1"
+      PYTORCH_CUDA_ALLOC_CONF: expandable_segments:True
+    secrets: [laya_key]
+    volumes: [models:/models:ro]
+    deploy: {resources: {reservations: {devices: [{driver: nvidia, device_ids: ["3"], capabilities: [gpu]}]}}}
+    restart: unless-stopped
+
+  laya-vision:
+    image: ghcr.io/deckforge/deckforge-laya-vision:${DF_VERSION}   # vendored fork code, our df-laya-vision weights only
+    profiles: ["gpu"]
+    environment: {LV_DEVICE: cuda, LV_CHECKPOINT: /models/df-laya-vision, LV_PORT: "8210"}
+    secrets: [laya_key]
+    volumes: [models:/models:ro]
+    depends_on: [laya]
+    deploy: {resources: {reservations: {devices: [{driver: nvidia, device_ids: ["3"], capabilities: [gpu]}]}}}
+    restart: unless-stopped
+
+  clm-encoder:                    # frozen base Qwen3-8B, pooling only (CLM heads need the base encoder)
+    image: vllm/vllm-openai:${VLLM_TAG}
+    profiles: ["gpu"]
+    command: ["/models/qwen3-8b-base", "--served-model-name", "qwen3-8b", "--runner", "pooling",
+              "--max-model-len", "2048", "--gpu-memory-utilization", "0.25"]
+    volumes: [models:/models:ro]
+    depends_on: [laya-vision]
+    deploy: {resources: {reservations: {devices: [{driver: nvidia, device_ids: ["3"], capabilities: [gpu]}]}}}
+    restart: unless-stopped
+
+  clm:
+    image: ghcr.io/deckforge/deckforge-clm:${DF_VERSION}           # python + contrastive-lm==0.1.0
+    profiles: ["gpu"]
+    entrypoint: ["/bin/sh", "-c", "export CLM_API_KEY=$$(cat /run/secrets/clm_key) && exec clm-serve \"$$@\"", "--"]
+    command: ["--port", "8700", "--emb-url", "http://clm-encoder:8000/v1/embeddings", "--emb-model", "qwen3-8b",
+              "--ckpt-dir", "/models/clm-heads", "--device", "cuda", "--action-cache", "512MiB", "--no-ui"]
+    secrets: [clm_key]
+    volumes: [models:/models:ro]
+    depends_on: [clm-encoder]
+    deploy: {resources: {reservations: {devices: [{driver: nvidia, device_ids: ["3"], capabilities: [gpu]}]}}}
+    restart: unless-stopped
+
+  vllm-vlm:
+    image: vllm/vllm-openai:${VLLM_TAG}
+    profiles: ["gpu"]
+    entrypoint: ["/bin/sh", "-c", "export VLLM_API_KEY=$$(cat /run/secrets/pool_key) && exec vllm serve \"$$@\"", "--"]
+    command: ["/models/df-vlm-fp8", "--served-model-name", "df-vlm", "--gpu-memory-utilization", "0.45",
+              "--kv-cache-dtype", "fp8", "--max-model-len", "16384", "--max-num-seqs", "16",
+              "--limit-mm-per-prompt", "{\"image\": 1}", "--enable-prefix-caching"]
+    volumes: [models:/models:ro]
+    secrets: [pool_key]
+    depends_on: [clm-encoder]
+    deploy: {resources: {reservations: {devices: [{driver: nvidia, device_ids: ["3"], capabilities: [gpu]}]}}}
     restart: unless-stopped
 
   postgres:
@@ -191,34 +261,31 @@ secrets:
   jwt: {file: ./secrets/jwt}
   secrets_key: {file: ./secrets/secrets_key}
   laya_key: {file: ./secrets/laya_key}
-  litellm_key: {file: ./secrets/litellm_master_key}
+  pool_key: {file: ./secrets/pool_key}
+  clm_key: {file: ./secrets/clm_key}
   postgres_password: {file: ./secrets/postgres_password}
 ```
 
-The app reads `*_FILE` variants of secret settings (`DF_JWT_SECRET_FILE=/run/secrets/jwt` and so on): `Settings` loads the file content when the `_FILE` variable is set (T-0.5). The `litellm` database is created by the migrate step (`CREATE DATABASE litellm` if missing). `deckforge secrets init` writes the secret files and the matching `POSTGRES_PASSWORD` line into `.env` (Compose interpolates it into connection strings).
+The app reads `*_FILE` variants of secret settings (`DF_JWT_SECRET_FILE=/run/secrets/jwt` and so on): `Settings` loads the file content when the `_FILE` variable is set (T-0.5). `deckforge secrets init` writes the secret files and the matching `POSTGRES_PASSWORD` line into `.env` (Compose interpolates it into connection strings).
 
-Start: `docker compose --profile laya --profile llm --profile gpu up -d` on a single GPU host, or split services across hosts with the same file and `DOCKER_HOST` per host (or move to Kubernetes, section 7).
+Start: `docker compose --profile gpu up -d` on a host with the GPUs (the CPU-only services start without a profile), or split services across hosts with the same file and `DOCKER_HOST` per host (or move to Kubernetes, section 7).
 
-### 2.3 LiteLLM config (`deploy/litellm/config.yaml`)
+### 2.3 Model pools
 
-```yaml
-model_list:
-  - model_name: planner-main
-    litellm_params: {model: openai/planner-main, api_base: http://vllm:8000/v1, api_key: "none"}
-  - model_name: vision-main
-    litellm_params: {model: openai/vision-main, api_base: http://vllm-vision:8000/v1, api_key: "none"}
-litellm_settings:
-  drop_params: false
-  num_retries: 2
-  request_timeout: 300
-general_settings:
-  master_key: os.environ/LITELLM_MASTER_KEY
-  database_url: os.environ/DATABASE_URL
-router_settings:
-  routing_strategy: least-busy
+There is no external LLM gateway. The app's `ModelPool` router (`22`, section 6.1) reads `config/model_pools.yaml`, which lists `vllm-lm-a` and `vllm-lm-b` as replicas of the `lm` pool and `vllm-vlm` as the `vlm` pool, with their metrics URLs. Budgets, priorities, replica choice, adapter affinity and degradation are handled in the app. vLLM servers require the pool key (`VLLM_API_KEY`), and nothing outside the internal network can reach them.
+
+`deckforge models pull --release <df release>` (on a connected machine) or the air-gapped bundle (section 6) fills the `models` volume:
+
+```text
+/models/df-lm-32b-fp8/          merged multitask model, FP8
+/models/adapters/df-*/          agent LoRA adapters (PEFT folders)
+/models/df-vlm-fp8/             vision reviewer
+/models/qwen3-8b-base/          CLM encoder (base weights, not fine-tuned)
+/models/clm-heads/*.pt          CLM heads (reference and df-clm-*)
+/models/df-laya-active/         Laya checkpoint (symlink to the promoted version)
+/models/laya-base/              convaiinnovations/laya
+/models/df-laya-vision/         our Laya-Vision checkpoint
 ```
-
-DeckForge creates one LiteLLM virtual key per org (`POST /key/generate` with `max_budget`, `rpm_limit`, `tpm_limit`, `metadata.org_id`) when the org is created, stores it encrypted in `provider_credentials`, and uses it for that org's calls. Anthropic traffic does not go through the OpenAI-format route (`07`, A6). If central control of Anthropic keys is required, use LiteLLM's Anthropic pass-through endpoint with `ChatAnthropic(anthropic_api_url=...)`.
 
 ## 3. nginx
 
@@ -379,7 +446,7 @@ After changing the number of API replicas: `docker compose exec nginx nginx -s r
 |---|---|---|
 | API CPU or latency | p95 `http_request_duration_seconds` above 300 ms, CPU above 70% | Add API replicas (stateless). Reload nginx |
 | Queue wait | `deckforge_jobs_ready` above 2 x worker slots for 5 min, run start delay p95 above 60 s | Add worker replicas |
-| LLM throughput | vLLM queue time, gateway 429s, per-role semaphore wait | Add GPU capacity (more vLLM replicas behind LiteLLM `least-busy`), reduce `DF_RUN_MAX_CONCURRENCY` temporarily |
+| LLM throughput | vLLM KV usage and waiting requests, budget semaphore waits, degradation step (`22`, section 6) | Add GPU capacity (more vLLM replicas listed in `config/model_pools.yaml`), reduce `DF_RUN_MAX_CONCURRENCY` temporarily |
 | Renderer | renderer busy ratio above 80%, render time p95 above 30 s | Raise `DF_RENDERER_INSTANCES` or add renderer replicas (stateless, any number) |
 | Laya | p95 decision latency above 200 ms | Move Laya to GPU, add replicas (stateless, read-only models) |
 | PostgreSQL connections | above 70% of `max_connections` | Lower pool sizes, add PgBouncer in session mode (transaction mode breaks `LISTEN/NOTIFY` and prepared statements) |

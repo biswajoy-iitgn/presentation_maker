@@ -197,13 +197,17 @@ class Severity(StrEnum):
 
 class Defect(BaseModel):
     id: str
-    code: str                                    # catalogue in 09, section 7 (e.g. "TITLE_NOT_ACTION", "LINT_OVERLAP")
+    code: str                                    # catalogue in 09, section 6.1 (e.g. "TITLE_NOT_ACTION", "LINT_OVERLAP")
     severity: Severity
     slide_id: str | None                         # None for deck-level defects
     tier: Literal[0, 1, 2, 3]                    # which evaluator tier found it
     evidence: str                                # short, human-readable
     element: str | None = None                   # shape name when known
-    suggested_repair: str | None = None          # repair strategy id (09, section 8)
+    suggested_repair: str | None = None          # repair strategy id (09, section 7)
+    standard_id: str | None = None               # design standard card id (28), e.g. "DS-FOCAL-01"
+    owner: str | None = None                     # agent that owns the faulty artefact (27, section 4)
+    bbox: tuple[float, float, float, float] | None = None   # slide-relative box from the inspector (25)
+    fingerprint: str | None = None               # dedupe key across detectors and rounds (27, section 8.2)
     confidence: float = 1.0
     status: Literal["open", "repaired", "accepted", "wont_fix"] = "open"
 
@@ -211,11 +215,13 @@ class QAReport(BaseModel):
     run_id: str
     deck_version: int
     passed: bool                                 # no open blocker
-    score: float                                 # 0 to 100, weighted (09, section 7)
+    score: float                                 # 0 to 100, weighted (09, section 6.2)
     defects: list[Defect]
     lookfeel_markdown: str
     consistency: list[str]
 ```
+
+`QAReport` is the persisted form stored in `deck_versions.qa`. The QA agents send the same findings to the orchestrator as `REPORT(QAVerdict)` (`27`, section 3), and the `qa_router` writes the `QAReport` after each round. The `Defect` fields above are the persisted shape of a `Finding` (`27`, section 8.2).
 
 ### 2.8 `core/decision.py`
 
@@ -264,7 +270,7 @@ SQLAlchemy models in `deckforge/db/models.py` generate both. Types: `Uuid` (nati
 -- Tenancy and identity
 CREATE TABLE app.organizations (
   id uuid PRIMARY KEY, name text NOT NULL, slug text UNIQUE NOT NULL,
-  settings jsonb NOT NULL DEFAULT '{}',          -- allow_cloud_llm, default_family, research_enabled, retention_days
+  settings jsonb NOT NULL DEFAULT '{}',          -- default_family, research_enabled, retention_days, model_profile, allow_training, allow_exploration, fix_minor
   plan text NOT NULL DEFAULT 'standard', created_at timestamptz NOT NULL DEFAULT now());
 
 CREATE TABLE app.users (
@@ -295,7 +301,7 @@ CREATE TABLE app.api_keys (
 
 CREATE TABLE app.provider_credentials (
   id uuid PRIMARY KEY, org_id uuid REFERENCES app.organizations ON DELETE CASCADE,   -- null = install-wide
-  provider text NOT NULL,                        -- anthropic, openai_compatible, search
+  provider text NOT NULL,                        -- search, connector (SharePoint, Drive), smtp. No LLM provider keys: models run on-prem (19, D16)
   ciphertext bytea NOT NULL, nonce bytea NOT NULL,   -- AES-GCM with DF_SECRETS_KEY
   label text NOT NULL, created_at timestamptz NOT NULL DEFAULT now());
 
@@ -335,6 +341,8 @@ CREATE TABLE app.runs (
   resume_payload jsonb,                          -- user response, consumed by the next run.resume job
   cancel_requested boolean NOT NULL DEFAULT false,
   idempotency_key text, error_code text, error_message text,
+  kb_version text,                               -- knowledge base release used (28, section 5)
+  model_versions jsonb NOT NULL DEFAULT '{}',    -- df-lm, adapters, laya, clm heads, laya-vision checkpoints used
   started_at timestamptz, finished_at timestamptz, created_by uuid,
   created_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE (org_id, idempotency_key));
@@ -388,10 +396,11 @@ CREATE INDEX ON app.decision_log (decision_id, created_at);
 
 CREATE TABLE app.llm_calls (
   id uuid PRIMARY KEY, org_id uuid NOT NULL, run_id uuid, node text, role text NOT NULL,
-  provider text NOT NULL, model text NOT NULL, prompt_id text NOT NULL, prompt_version int NOT NULL,
+  pool text NOT NULL, model text NOT NULL, adapter text, agent_id text, prompt_id text NOT NULL, prompt_version int NOT NULL,
   prompt_hash text NOT NULL, input_tokens int, output_tokens int, cache_read_tokens int, cache_write_tokens int,
-  cost_micro_usd bigint, latency_ms int, cache_hit boolean NOT NULL DEFAULT false,
-  status text NOT NULL,                          -- ok, schema_error, provider_error, refusal, timeout
+  cost_micro_usd bigint, latency_ms int,         -- cost is internal, from config/pricing.yaml (07, section 7)
+  cache_hit boolean NOT NULL DEFAULT false,
+  status text NOT NULL,                          -- ok, schema_error, pool_error, refusal, timeout, budget_exhausted
   error text, created_at timestamptz NOT NULL DEFAULT now());
 CREATE INDEX ON app.llm_calls (org_id, created_at);
 
@@ -435,11 +444,11 @@ CREATE TABLE app.jobs (
 CREATE INDEX jobs_ready ON app.jobs (priority, run_after) WHERE status = 'queued';
 CREATE INDEX jobs_leased ON app.jobs (lease_expires_at) WHERE status = 'leased';
 
--- Knowledge base (vectors). PostgreSQL only. Lite mode keeps vectors in kb_items.vector_json and searches with numpy.
+-- Knowledge base (vectors). Namespaces and card schema are defined in 28. PostgreSQL only. Lite mode keeps vectors in kb_items.vector_json and searches with numpy.
 CREATE EXTENSION IF NOT EXISTS vector;
 CREATE TABLE app.kb_items (
   id uuid PRIMARY KEY, org_id uuid,              -- null = shared knowledge (framework library, exemplars)
-  namespace text NOT NULL,                       -- frameworks, exemplars, org_terms, tool_cards, icons
+  namespace text NOT NULL,                       -- frameworks, recipes, viz, exhibits, design, storyline, archetypes, industries, exemplars, tool_cards, org_terms, icons
   key text NOT NULL, text text NOT NULL, meta jsonb NOT NULL DEFAULT '{}',
   embedding vector(384),                         -- bge-small dimension
   embed_model text NOT NULL, UNIQUE (namespace, org_id, key));
@@ -447,6 +456,8 @@ CREATE INDEX ON app.kb_items USING hnsw (embedding vector_cosine_ops);
 ```
 
 LangGraph tables: created by `AsyncPostgresSaver.setup()` and `AsyncPostgresStore.setup()` in schema `lg` (connection string with `options=-csearch_path=lg`). The migration T-1.2 creates the schema. Lite mode: `AsyncSqliteSaver` in a separate file `{DF_DATA_DIR}/checkpoints.db`.
+
+Tables added by later phases (agent traces, agent messages, revisions, comments, variants, shares, daily usage), monthly partitioning of the telemetry streams and the index plan are in `23` (sections 3 and 4) and `27` (section 9, `agent_messages`).
 
 Optional Row-Level Security (server, T-12.5): enable RLS on tenant tables with policy `org_id = current_setting('app.org_id')::uuid`. The repository layer sets `SET LOCAL app.org_id` per transaction. Repositories also filter by `org_id` explicitly, so RLS is defence in depth.
 

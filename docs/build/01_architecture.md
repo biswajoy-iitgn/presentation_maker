@@ -18,7 +18,7 @@ The system works in six steps, each with deterministic checks:
 
 | Attribute | Target | How it is met |
 |---|---|---|
-| On-prem | No customer data leaves the install unless an org admin enables a cloud model | Local LLMs by default, egress allow-list, cloud provider off per org (`07`) |
+| On-prem | No customer data leaves the install. All models (DeckForge-LM, df-vlm, Laya, CLM) run locally | Open-weight models fine-tuned by us (`19`), egress allow-list, no cloud LLM providers (D16) |
 | Cross-platform | Lite mode installs and runs on macOS 13+, Windows 10/11, Ubuntu 22.04+ | Pure-Python core, bundled fonts, SQLite, optional LibreOffice (`14`) |
 | Concurrency | Reference server node: 100 active web sessions, 20 concurrent generation runs | Stateless API replicas, PostgreSQL job queue, worker pool, renderer pool, batched GPU inference (`14`) |
 | Deck latency | 15-slide deck: p50 at or under 5 min, p95 at or under 10 min on the reference node (target to validate in T-12.3) | Parallel slide composition, cached prefixes, Laya for fast decisions |
@@ -35,10 +35,9 @@ flowchart LR
     B1[Browser] --> P1["deckforge serve<br/>FastAPI + SPA + in-process worker"]
     P1 --> S1[(SQLite)]
     P1 --> F1[(Local files)]
-    P1 -. optional .-> O1[Ollama]
+    P1 --> O1[Ollama: df-lm-8b, df-vlm]
     P1 -. optional .-> L1[LibreOffice]
-    P1 -. optional .-> Y1[Laya in-process]
-    P1 -. optional, per org .-> C1[Cloud LLM API]
+    P1 -. optional .-> Y1[Laya ONNX in-process]
   end
 ```
 
@@ -53,19 +52,21 @@ flowchart LR
   W --> V
   W --> BS
   W --> R[renderer x K<br/>LibreOffice + unoserver]
-  W --> Y[laya-serve<br/>decisions and judges]
-  W --> G[LLM gateway<br/>LiteLLM proxy]
-  G --> VL[vLLM<br/>open-weight models on GPU]
-  G -. optional .-> CL[Cloud LLM APIs]
-  W -. optional .-> AN[Anthropic API via official SDK]
+  W --> Y[laya-serve<br/>typed decisions and judges]
+  W --> LV[laya-vision<br/>visual judges on snapshots]
+  W --> CLM[clm-serve + Qwen3-8B pooling encoder<br/>ranking and verification]
+  W --> MP[ModelPool router<br/>budgets, replica choice]
+  MP --> VL[vllm-lm-a, vllm-lm-b<br/>DeckForge-LM + agent LoRA adapters]
+  MP --> VV[vllm-vlm<br/>df-vlm]
   W --> SX[SearXNG<br/>web search, optional]
-  OT[otel-collector, Prometheus, Grafana] -.-> A & W & R & Y
+  TR[training host<br/>TRL, PEFT, MLflow] -. releases .-> VL
+  OT[otel-collector, Prometheus, Grafana, DCGM] -.-> A & W & R & Y & VL
 ```
 
 | Mode | Who | Database | Queue | Cache and events | Blobs | LLM | Laya | Previews |
 |---|---|---|---|---|---|---|---|---|
-| Lite | One user, laptop | SQLite (`aiosqlite`) | In-process asyncio worker reading the `jobs` table | In-process memory plus SQLite cache table, in-process event bus | Local folder | Ollama or a cloud key | In-process `laya.Router` if the `laya` extra is installed, else off | `soffice` subprocess if installed, else off |
-| Server | Many users | PostgreSQL 17 + pgvector | `jobs` table with leases, `LISTEN/NOTIFY` wake-up | Valkey | Local volume or S3-compatible | LiteLLM proxy in front of vLLM, Ollama or cloud | `laya-serve` HTTP service | `renderer` service with `unoserver` pool |
+| Lite | One user, laptop | SQLite (`aiosqlite`) | In-process asyncio worker reading the `jobs` table | In-process memory plus SQLite cache table, in-process event bus | Local folder | Ollama with `df-lm-8b` (tier-dependent, `22` section 5) | Laya ONNX in-process if the `laya` extra is installed, else off. CLM off | `soffice` subprocess if installed, else off |
+| Server | Many users | PostgreSQL 17 + pgvector | `jobs` table with leases, `LISTEN/NOTIFY` wake-up | Valkey | Local volume or S3-compatible | vLLM replicas with multi-LoRA behind the built-in `ModelPool` router | `laya-serve`, `laya-vision`, `clm-serve` HTTP services | `renderer` service with `unoserver` pool |
 
 Both modes run the same graphs, nodes, prompts and renderer. Only adapters differ (section 5).
 
@@ -75,11 +76,14 @@ Both modes run the same graphs, nodes, prompts and renderer. Only adapters diffe
 |---|---|---|---|---|
 | `nginx` | `nginx:stable` | 1 to 2 | TLS, static SPA, reverse proxy, coarse rate limits, SSE pass-through, upload size limit | Hold application logic |
 | `api` | `deckforge` | CPU, request rate | Auth, validation, CRUD, enqueue jobs, SSE relay from Valkey, signed downloads | Call LLMs or render (except tiny sync helpers) |
-| `worker` | `deckforge` | Queue depth | Execute LangGraph runs, template ingestion, evals. Call LLM gateway, Laya, renderer, tools | Serve HTTP |
+| `worker` | `deckforge` | Queue depth | Execute LangGraph runs (agents, `20`), template ingestion, evals. Call model pools, Laya, CLM, renderer, tools | Serve HTTP |
 | `renderer` | `deckforge-renderer` | Render queue, CPU | PPTX to PDF to PNG conversions, nothing else | Access the database |
 | `laya` | `deckforge-laya` | GPU or CPU, decision rate | `laya-serve` with DeckForge checkpoints | Be reachable from outside the internal network |
-| `litellm` | `litellm` | 1 to 2 | OpenAI-compatible gateway: virtual keys, budgets, rate limits, fallbacks, logging | Store customer documents |
-| `vllm` | `vllm/vllm-openai` | GPUs | Serve open-weight chat and vision models with prefix caching | Run on the CPU node |
+| `vllm-lm-a`, `vllm-lm-b` | `vllm/vllm-openai` | GPUs | Serve DeckForge-LM with agent LoRA adapters, FP8, prefix caching (`22`, section 4) | Run on the CPU node |
+| `vllm-vlm` | `vllm/vllm-openai` | GPU share | Serve `df-vlm` for visual review | |
+| `laya-vision` | `deckforge-laya-vision` | GPU share or CPU | Visual typed judges on slide snapshots (`25`, section 4) | Use the non-commercial public weights |
+| `clm` | `deckforge-clm` (`contrastive-lm`) + `vllm` pooling encoder (base Qwen3-8B) | GPU share | Ranking and best-of-N verification (`24`, section 2) | Use a fine-tuned encoder (heads need the base encoder) |
+| `trainer` | `deckforge-train` | GPU, night window | Fine-tuning jobs and teacher generation (`19`, `24`) | Run on customer servers unless `allow_training` |
 | `postgres` | `pgvector/pgvector:pg17` | Vertical, then read replica | App data, jobs, LangGraph checkpoints and store, vectors | |
 | `valkey` | `valkey/valkey:8` | 1 (replica optional) | Cache, rate-limit buckets, event pub/sub, locks | Hold data that cannot be rebuilt |
 | `searxng` | `searxng/searxng` | 1 | Metasearch for research (optional) | Be exposed publicly |
@@ -95,8 +99,9 @@ The domain code (`deckforge.core`, `deckforge.story`, `deckforge.viz`, `deckforg
 | `EventBus` | `publish(channel, event)`, `subscribe(channel) -> AsyncIterator` | `MemoryEventBus` | `ValkeyEventBus` | `MemoryEventBus` |
 | `Cache` | `get(key)`, `set(key, value, ttl_s)`, `lock(key, ttl_s)` | `SqliteCache` + memory LRU | `ValkeyCache` | `MemoryCache` |
 | `VectorStore` | `upsert(namespace, items)`, `search(namespace, vector, k, filter)` | `NumpyVectorStore` (exact search) | `PgVectorStore` | `NumpyVectorStore` |
-| `LLMProvider` | `chat_model(role) -> BaseChatModel` | `ModelRegistry` | `ModelRegistry` | `FakeLLM` |
-| `DecisionEngine` | `decide(decision_id, state_text, ctx) -> Decision`, `decide_batch(...)` | `InprocLaya` or `NullLaya` | `HttpLaya` | `FakeLaya` |
+| `LLMProvider` | `chat_model(role, adapter) -> BaseChatModel` | `ModelRegistry` (Ollama) | `ModelRegistry` (vLLM pools via `ModelPool`) | `FakeLLM` |
+| `DecisionEngine` | `decide(decision_id, state_text, ctx) -> Decision`, `decide_batch(...)`, `rank(ranker_id, state_text, candidates, ctx) -> list[Ranked]` | `InprocLaya` or `NullLaya`, ranking by embeddings only | `HttpLaya` + `HttpClm` | `FakeLaya` |
+| `VisualJudge` | `judge(images, questions, ctx) -> list[Decision]` | `NullVisualJudge` (or in-process on L3 laptops) | `HttpLayaVision` | `FakeVisualJudge` |
 | `PreviewRenderer` | `pptx_to_pdf(pptx_key) -> pdf_key`, `pdf_to_pngs(pdf_key, dpi) -> list[key]` | `SofficeRenderer` or `NullRenderer` | `HttpRenderer` (to `renderer` service) | `FakeRenderer` |
 | `SearchProvider` | `search(query, k, recency_days) -> list[SearchHit]` | `NullSearch` or customer API | `SearxngSearch` | `FakeSearch` |
 | `ImageProvider` | existing `deckforge.assets.resolver` sources | existing | existing | existing fakes |

@@ -2,111 +2,111 @@
 
 ## 1. Responsibilities
 
-`deckforge/llm/` gives every node a ready `BaseChatModel` for a role, enforces structured output, records usage and cost, applies caches and limits, and hides provider differences. Nodes never construct model clients themselves.
+`deckforge/llm/` gives every agent a ready chat model for its role and adapter, enforces structured output, routes calls to model replicas without overloading them, records usage and cost, and applies caches. Agents never construct model clients themselves.
+
+All language models are **DeckForge-LM** (`19`): open-weight models fine-tuned by us and served locally. There is no cloud LLM provider and no external LLM gateway (D16).
 
 ## 2. Roles
 
-| Role | Used by | Output | Typical input / output tokens | Concurrency limit per worker |
-|---|---|---|---|---|
-| `planner` | frame_problem, issue_tree, pick_frameworks, storyline, revise_* | Pydantic models | 8k to 16k / 1k to 3k | 4 |
-| `writer` | write_copy, repair (copy) | `SlideCopy` | 3k to 5k / 400 to 800 | 8 |
-| `extractor` | normalise_brief, clarify questions, research extraction, template naming | Pydantic models | 2k to 8k / 200 to 1k | 8 |
-| `judge` | Tier 2 judges, teacher labelling | `JudgeVerdict` | 2k to 4k / 150 to 300 | 8 |
-| `vision_judge` | Tier 3 judges on rendered PNGs | `VisualVerdict` | 1 image + 1k / 300 | 2 |
-| `embed` | kb search, icon search, tool cards | vectors | short texts | n/a (in-process) |
+| Role | Used by agents (`20`) | Model and adapter | Output | Typical input / output tokens | Thinking mode |
+|---|---|---|---|---|---|
+| `planner` | engagement_manager | `df-lm` + `df-planner` | Pydantic models | 8k to 16k / 1k to 3k | off by default, short thinking only if evals show it pays |
+| `writer` | copywriter, viz_designer, art_director, repair_specialist | `df-lm` + agent adapter | `SlideCopy`, `ExhibitDecision`, `AssetPlan`, patches | 3k to 5k / 400 to 800 | off |
+| `extractor` | intake_analyst, data_analyst, researcher, supervisor, template_designer | `df-lm` + agent adapter | Pydantic models, tool calls | 2k to 8k / 200 to 1.5k | off |
+| `judge` | reviewer, fact_checker (Tier 2) | `df-lm` + `df-reviewer` | `JudgeVerdict` | 2k to 4k / 150 to 300 | off |
+| `vision_judge` | reviewer (Tier 3, inspector L5) | `df-vlm` | `VisualVerdict` | 1 image + 1k / 300 | off |
+| `embed` | knowledge base, tool cards, icons | fastembed `BAAI/bge-small-en-v1.5` in process | vectors | short texts | n/a |
 
-## 3. Providers and adapters
+Until Stage 5 of training (`19`, section 5.5) produces per-agent adapters, every adapter name maps to the multitask model (the merged Stage 1 to 4 model). The adapter field is still sent, so switching to real adapters needs only a config change.
 
-| `kind` | Adapter | Client | When |
+## 3. Serving backends and adapters
+
+| `kind` | Adapter class | Client | Where |
 |---|---|---|---|
-| `openai_compatible` | `OpenAICompatAdapter` | `langchain_openai.ChatOpenAI(base_url=..., api_key=..., model=...)` | vLLM, Ollama (`/v1`), LiteLLM gateway |
-| `anthropic` | `AnthropicAdapter` | `langchain_anthropic.ChatAnthropic` (official `anthropic` SDK underneath) | Cloud profile, opt-in per org. Optionally pointed at the LiteLLM Anthropic pass-through route via `anthropic_api_url` for central key management |
-| `fake` | `FakeLLM` | ours | Tests |
+| `vllm_pool` | `PoolAdapter` | `langchain_openai.ChatOpenAI(base_url=<replica>/v1, api_key=<pool key>, model=<adapter or base name>, extra_body=...)`, replica chosen per call by `ModelPool` (`22`, section 6.1) | server |
+| `ollama` | `OllamaAdapter` | `ChatOpenAI(base_url="http://127.0.0.1:11434/v1", api_key="ollama", model="df-lm-8b:q4_k_m")` | laptops |
+| `llamacpp` | `LlamaCppAdapter` | `ChatOpenAI(base_url="http://127.0.0.1:8080/v1", ...)`, per-request LoRA scales through `extra_body={"lora": [...]}` when per-agent adapters are used on laptops | laptops (optional) |
+| `fake` | `FakeLLM` | ours | tests |
+
+vLLM serves LoRA adapters under their own model names (`--lora-modules df-writer=/models/adapters/df-writer ...`), so selecting an adapter is selecting the `model` field of the request.
 
 ### 3.1 `config/models.yaml`
 
 ```yaml
-providers:
-  vllm:
-    kind: openai_compatible
-    base_url: ${DF_LLM_GATEWAY_URL:-http://litellm:4000/v1}
-    api_key_env: DF_LLM_GATEWAY_KEY
-  ollama:
-    kind: openai_compatible
-    base_url: http://localhost:11434/v1
-    api_key: ollama
-  anthropic:
-    kind: anthropic
-    api_key_env: ANTHROPIC_API_KEY
+pools_file: config/model_pools.yaml          # replicas, adapters, budgets (22, section 6.1)
 
 profiles:
-  onprem:                                   # default for server mode
-    planner:      {provider: vllm, model: planner-main, max_tokens: 4000, temperature: 0.2, timeout_s: 180, context_window: 65536}
-    writer:       {provider: vllm, model: planner-main, max_tokens: 1200, temperature: 0.4, timeout_s: 90,  context_window: 65536}
-    extractor:    {provider: vllm, model: planner-main, max_tokens: 1500, temperature: 0.0, timeout_s: 60,  context_window: 65536}
-    judge:        {provider: vllm, model: planner-main, max_tokens: 600,  temperature: 0.0, timeout_s: 60,  context_window: 65536}
-    vision_judge: {provider: vllm, model: vision-main,  max_tokens: 600,  temperature: 0.0, timeout_s: 90,  context_window: 32768}
-  laptop:                                   # default for lite mode
-    planner:      {provider: ollama, model: "<chosen local model>", max_tokens: 4000, temperature: 0.2, timeout_s: 600, context_window: 32768}
-    writer:       {provider: ollama, model: "<chosen local model>", max_tokens: 1200, temperature: 0.4, timeout_s: 300, context_window: 32768}
-    extractor:    {provider: ollama, model: "<chosen local model>", max_tokens: 1500, temperature: 0.0, timeout_s: 300, context_window: 32768}
-    judge:        {provider: ollama, model: "<chosen local model>", max_tokens: 600,  temperature: 0.0, timeout_s: 300, context_window: 32768}
-    vision_judge: {provider: ollama, model: "<chosen local vision model>", max_tokens: 600, temperature: 0.0, timeout_s: 300, context_window: 16384}
-  cloud_claude:                             # opt-in: DF_ALLOW_CLOUD_LLM=true and org setting allow_cloud_llm
-    planner:      {provider: anthropic, model: claude-opus-5-5, max_tokens: 16000, effort: high,   timeout_s: 300, context_window: 1000000}
-    writer:       {provider: anthropic, model: claude-opus-5-5, max_tokens: 4000,  effort: medium, timeout_s: 120, context_window: 1000000}
-    extractor:    {provider: anthropic, model: claude-opus-5-5, max_tokens: 4000,  effort: low,    timeout_s: 120, context_window: 1000000}
-    judge:        {provider: anthropic, model: claude-opus-5-5, max_tokens: 2000,  effort: low,    timeout_s: 120, context_window: 1000000}
-    vision_judge: {provider: anthropic, model: claude-opus-5-5, max_tokens: 2000,  effort: medium, timeout_s: 120, context_window: 1000000}
+  server:                                    # default in server mode
+    planner:      {backend: vllm_pool, pool: lm,  adapter: df-planner,  max_tokens: 4000, temperature: 0.2, timeout_s: 180, context_window: 32768, thinking: false}
+    writer:       {backend: vllm_pool, pool: lm,  adapter: df-writer,   max_tokens: 1200, temperature: 0.4, timeout_s: 90,  context_window: 32768, thinking: false}
+    extractor:    {backend: vllm_pool, pool: lm,  adapter: df-intake,   max_tokens: 1500, temperature: 0.0, timeout_s: 60,  context_window: 32768, thinking: false}
+    judge:        {backend: vllm_pool, pool: lm,  adapter: df-reviewer, max_tokens: 600,  temperature: 0.0, timeout_s: 60,  context_window: 32768, thinking: false}
+    vision_judge: {backend: vllm_pool, pool: vlm, adapter: null,        max_tokens: 600,  temperature: 0.0, timeout_s: 90,  context_window: 16384, thinking: false}
+  laptop:                                    # default in lite mode, tier chosen by `deckforge doctor`
+    planner:      {backend: ollama, model: "df-lm-8b:q4_k_m", max_tokens: 4000, temperature: 0.2, timeout_s: 600, context_window: 16384, thinking: false}
+    writer:       {backend: ollama, model: "df-lm-8b:q4_k_m", max_tokens: 1200, temperature: 0.4, timeout_s: 300, context_window: 16384, thinking: false}
+    extractor:    {backend: ollama, model: "df-lm-8b:q4_k_m", max_tokens: 1500, temperature: 0.0, timeout_s: 300, context_window: 16384, thinking: false}
+    judge:        {backend: ollama, model: "df-lm-8b:q4_k_m", max_tokens: 600,  temperature: 0.0, timeout_s: 300, context_window: 16384, thinking: false}
+    vision_judge: {backend: ollama, model: "df-vlm:q4_k_m",   max_tokens: 600,  temperature: 0.0, timeout_s: 300, context_window: 8192,  thinking: false}
 
-embed: {provider: fastembed, model: BAAI/bge-small-en-v1.5, dim: 384}
-default_profile: {lite: laptop, server: onprem}
+agent_adapters:                              # agent id -> adapter name (used when the agent's card says adapter: auto)
+  supervisor: df-supervisor
+  intake_analyst: df-intake
+  data_analyst: df-analyst
+  engagement_manager: df-planner
+  researcher: df-researcher
+  viz_designer: df-viz
+  copywriter: df-writer
+  art_director: df-art
+  reviewer: df-reviewer
+  fact_checker: df-reviewer
+  repair_specialist: df-repair
+
+embed: {backend: fastembed, model: BAAI/bge-small-en-v1.5, dim: 384}
+default_profile: {lite: laptop, server: server}
 ```
 
-`planner-main` and `vision-main` are served-model aliases configured in vLLM (`--served-model-name`) or in LiteLLM's `model_list`, so swapping the underlying model needs no app change.
+Laptop tiers L2 and L3 override `model` and `context_window` from the doctor's tier file (`22`, section 5).
 
-### 3.2 Provider-specific rules (must be implemented in the adapters)
+### 3.2 Backend rules (implemented in the adapters)
 
-| Provider | Rule |
+| Topic | Rule |
 |---|---|
-| vLLM | Structured output via `response_format={"type": "json_schema", ...}` (`with_structured_output(Model, method="json_schema", strict=True)`). Server started with `--enable-prefix-caching`. Tool calling needs `--enable-auto-tool-choice` and the model's `--tool-call-parser` (only the research agent uses tools) |
-| Ollama | `with_structured_output(Model, method="json_schema")` maps to Ollama's `format` JSON schema through the OpenAI-compatible endpoint. If a model ignores it, the adapter falls back to `method="json_mode"` plus validation |
-| LiteLLM | Pass-through of the above. Each org gets a virtual key with budget and rpm/tpm limits (`14`, section 2.3) |
-| Anthropic (`claude-opus-5-5`) | Use `with_structured_output(Model, method="json_schema")`. Never the default `function_calling` method: it forces `tool_choice`, which `claude-opus-5-5` rejects with HTTP 400. Do not send `temperature`, `top_p` or `top_k` (rejected on this model). Do not send a `thinking` config (thinking is always on, adaptive). Control depth with `output_config={"effort": "low" \| "medium" \| "high" \| "xhigh" \| "max"}`. The default effort on this model is `medium`, so set it explicitly per role. Handle `stop_reason == "refusal"` (map to `ProviderError(code="refusal", retryable=False)`). Enable the server-side fallback beta (`betas=["server-side-fallback-2026-07-01"]` with request field `fallbacks: "default"`) and verify in T-3.4 that `langchain-anthropic` forwards the field (`model_kwargs`). If it does not, `AnthropicAdapter` calls the `anthropic` SDK directly for that request. No assistant prefill (rejected) |
-| Anthropic prompt caching | Prefix order is tools, then system, then messages. At most 4 `cache_control` breakpoints. Default TTL 5 minutes, `{"type": "ephemeral", "ttl": "1h"}` for the per-run stable prefix. Prefixes below the model's minimum cacheable length (512 to 4096 tokens depending on model) silently do not cache. Verify with `usage.cache_read_input_tokens` in `llm_calls` |
+| Structured output | `with_structured_output(Model, method="json_schema", strict=True)`. vLLM enforces the schema with its default structured-output backend (xgrammar). Ollama receives the schema as its `format`. If a laptop model ignores it, the adapter falls back to `method="json_mode"` plus validation and one repair |
+| Thinking mode | Qwen3-family chat templates have a thinking switch. The adapter sends `extra_body={"chat_template_kwargs": {"enable_thinking": spec.thinking}}` on vLLM. On Ollama the request option `think` is set from `spec.thinking`. Training data (`19`) teaches the same default (no reasoning traces for structured roles), so outputs stay short |
+| Tool calling (ReAct agents) | vLLM started with `--enable-auto-tool-choice --tool-call-parser <parser for the base family>` (for Qwen3: `hermes`). Tool schemas come from `ToolSpec` (`21`, section 3) |
+| Sampling | `temperature` per role, `top_p` 0.95 for writer, `seed` set per call from (run id, node, attempt) so retries are reproducible |
+| Prefix caching | vLLM `--enable-prefix-caching`. Prompts keep stable sections first (`10`, section 9) and the router keeps a run on one replica when possible (`22`, section 6.1) |
+| Context limit | every request is checked against `context_window` by the `ContextBuilder` before sending. Overflow is a bug, never truncated silently |
+| Admission | every call reserves `estimated_prompt_tokens + max_tokens` from the pool budget and waits in its priority class (`22`, section 6.2) |
 
 ## 4. Public interface
 
 ```python
 # deckforge/llm/registry.py
 class ModelRegistry:
-    def __init__(self, config: ModelsConfig, settings: Settings, credentials: CredentialStore): ...
-    def chat_model(self, role: Role, *, org: OrgSettings) -> BaseChatModel: ...      # cached per (profile, role)
-    def spec(self, role: Role, *, org: OrgSettings) -> RoleSpec: ...                  # max_tokens, context_window...
+    def __init__(self, config: ModelsConfig, pools: ModelPools, settings: Settings): ...
+    def chat_model(self, role: Role, *, adapter: str | None, org: OrgSettings) -> BaseChatModel: ...   # cached per (profile, role, adapter)
+    def spec(self, role: Role, *, org: OrgSettings) -> RoleSpec: ...
 
 # deckforge/llm/call.py
-async def structured(
-    ctx: LLMCallContext,              # org_id, run_id, node, role, cache policy, event sink
-    prompt: RenderedPrompt,           # from prompting (section 6): messages + prompt_id + version + hash
-    schema: type[T],                  # Pydantic model
-    *,
-    max_repairs: int = 1,
-) -> T: ...
-
+async def structured(ctx: LLMCallContext, prompt: RenderedPrompt, schema: type[T], *, max_repairs: int = 1) -> T: ...
 async def text(ctx: LLMCallContext, prompt: RenderedPrompt) -> str: ...
 async def vision(ctx: LLMCallContext, prompt: RenderedPrompt, images: list[bytes], schema: type[T]) -> T: ...
 ```
 
+`LLMCallContext` carries org, run, node, agent id, role, adapter, priority class, cache policy and the event sink.
+
 `structured()` algorithm:
 
-1. Check the quota and the per-role semaphore.
-2. Build the LLM cache key (`11`, layer 3). On hit, record an `llm_calls` row with `cache_hit=true` and return.
-3. `model = registry.chat_model(role).with_structured_output(schema, method=<per provider>, include_raw=True)`.
-4. `await model.ainvoke(prompt.messages, config={"callbacks": [UsageCallback(ctx)], "run_name": prompt.prompt_id})` with `asyncio.timeout(spec.timeout_s)`.
-5. If `parsed` is `None` or validation fails: append one user message `"Your previous output failed validation: <errors>. Return only valid JSON for the schema."` and retry once (`max_repairs`). Still failing: raise `ValidationFailed` (the node's `RetryPolicy` does not retry this error type, the node's fallback logic decides).
-6. Record usage (tokens, cache tokens, latency, cost from `config/pricing.yaml`), write the cache, return the model.
+1. Check the quota and reserve tokens from the pool budget in the call's priority class (`22`, section 6.2).
+2. Build the LLM cache key (`11`, layer 3). On a hit, release the reservation, record an `llm_calls` row with `cache_hit=true` and return.
+3. Pick a replica with `ModelPool.choose(adapter, run_id)`, get `registry.chat_model(role, adapter=...)` bound to it, then `.with_structured_output(schema, method="json_schema", strict=True, include_raw=True)`.
+4. `await model.ainvoke(prompt.messages, config={"callbacks": [UsageCallback(ctx)], "run_name": prompt.prompt_id})` within `asyncio.timeout(spec.timeout_s)`.
+5. If parsing or validation fails: append one user message `"Your previous output failed validation: <errors>. Return only valid JSON for the schema."` and retry once. Still failing: raise `ValidationFailed` (not retried by the node's `RetryPolicy`, the node's fallback decides).
+6. Release the reservation, record usage (tokens, prefix cache hits from vLLM usage when reported, latency, internal cost from `config/pricing.yaml`), write the cache, return the model.
 
-Errors are mapped to `ProviderError(provider, code, retryable)`: timeouts, 429 and 5xx are retryable. 400, auth errors, refusals and context overflow are not.
+Errors map to `ProviderError(backend, code, retryable)`: timeouts, connection errors, 429 and 5xx are retryable (another replica is tried first). 400, schema errors and context overflow are not.
 
 ## 5. Output schemas (examples)
 
@@ -209,8 +209,8 @@ Return the storyline as JSON matching the schema.
 ## 7. Usage, cost and limits
 
 - `UsageCallback` (LangChain callback handler) reads `usage_metadata` from `AIMessage` (input, output, cache read, cache creation tokens) and writes `llm_calls` plus `usage_ledger`.
-- Cost table `config/pricing.yaml` maps `provider/model` to micro-dollars per million tokens for input, output, cache read, cache write. On-prem models have a configurable internal cost (GPU-hour amortised) so dashboards compare like for like.
-- A run-level budget (`options.max_cost_micro_usd`, default unlimited on-prem) stops new LLM calls with `QuotaExceeded` when exceeded. The run finishes with what it has and reports it.
+- Cost table `config/pricing.yaml` maps each pool to an internal cost per million input and output tokens (GPU-hour cost amortised over measured throughput), so dashboards show cost per deck and per agent.
+- A run-level budget (`options.max_tokens_total`, default unlimited) stops new LLM calls with `QuotaExceeded` when exceeded. The run finishes with what it has and reports it.
 
 ## 8. Choosing models (procedure, T-11.6)
 

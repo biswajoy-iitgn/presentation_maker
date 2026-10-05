@@ -7,13 +7,16 @@
 | 1 | HTTP static | SPA assets (hashed file names), fonts | nginx / FastAPI `StaticFiles` | URL | 1 year, `immutable` | new build (new hashes). `index.html` is `no-cache` |
 | 2 | API conditional GET | Artifacts, previews, design-system previews | ETag = sha256 of blob | URL + ETag | client-side | blob content change |
 | 3 | LLM response (exact) | Parsed structured output of deterministic calls | Valkey + optional `llm_cache` table / SQLite cache table | see 2.1 | 7 days | prompt version, model id, schema hash, params |
-| 4 | Provider prefix cache | KV cache of stable prompt prefixes | vLLM GPU memory, Anthropic server cache | automatic prefix match | vLLM: LRU in GPU memory. Anthropic: 5 min or 1 h | any byte change in the prefix |
+| 4 | Model prefix cache | KV cache of stable prompt prefixes, per adapter | vLLM GPU memory (FP8 KV) / Ollama or llama.cpp context cache | automatic prefix match, `ModelPool` prefix-affinity routing | LRU in GPU memory | any byte change in the prefix, adapter change |
 | 5 | Laya decision | `Decision` for an exact state text | Valkey / SQLite | see 2.2 | 30 days | question version, checkpoint |
 | 6 | Embeddings | Vectors for texts | `kb_items` for corpora, Valkey for ad-hoc texts / SQLite | `emb:{model}:{sha256(text)}` | 90 days (ad-hoc) | embedding model change |
 | 7 | Tool results | `ToolResult.data` for cacheable tools | Valkey / SQLite | see 2.3 | per `ToolSpec.cache_ttl_s` | tool version |
 | 8 | Assets | Icons, flags, maps, Natural Earth GeoJSON, stock photos, generated images | Blob store `assets/` (content addressed) + in-process LRU | sha256 of source URL + params, then content sha | permanent (licence sidecar) | never (new params give a new key) |
 | 9 | Previews | PNGs of a deck version | Blob store | `deck_hash` = sha256(pptx bytes) | life of the deck version | new deck version |
 | 10 | LangGraph node cache | Output of pure deterministic nodes (`bind_data`, table profiling, template ingestion steps) | `RedisCache` / `SqliteCache` | `CachePolicy.key_func` over the node inputs | 24 h | input change |
+| 11 | CLM action embeddings | Embeddings of rankable candidates (framework cards, exhibit cards, icons, tool descriptions) | `clm-serve` fixed-size vector cache (GPU or RAM) / in-process numpy | candidate set version (`kb_version`, icon library version, tool registry hash) + candidate id | until the set version changes | new `kb_version` or registry hash (`09`, section 10) |
+| 12 | Knowledge base cards | All non-exemplar cards, parsed | in-process dict per worker | `kb_version` + card id | process life | new `kb_version` (worker reload on release) |
+| 13 | LoRA adapters | Agent adapters in GPU slots and CPU RAM | vLLM `--max-loras` GPU slots, `--max-cpu-loras` CPU cache | adapter name and version | LRU | new adapter version (`19`, section 9) |
 
 ## 2. Key construction
 
@@ -26,7 +29,7 @@ llm:{org_scope}:{provider}:{model}:{prompt_id}:v{prompt_version}:{schema_hash}:{
 ```
 
 - `org_scope` = org id. Never shared across orgs, because rendered messages contain customer data.
-- Only for calls with temperature 0 (or Anthropic roles with effort `low` used for extraction and judging) and `cacheable: true` in the prompt front matter. Generation prompts (`write_copy`, `storyline`) are cacheable only within the same run (the key adds the run id), so re-running a node after a crash does not pay twice, but two runs do not get identical copy.
+- Only for calls with temperature 0 (extraction and judging roles, thinking off) and `cacheable: true` in the prompt front matter. The key includes the adapter name and version. Generation prompts (`write_copy`, `storyline`) are cacheable only within the same run (the key adds the run id), so re-running a node after a crash does not pay twice, but two runs do not get identical copy.
 - A run option `fresh: true` bypasses layer 3 for that run.
 
 ### 2.2 Laya decision cache

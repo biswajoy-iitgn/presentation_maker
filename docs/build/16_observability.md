@@ -35,10 +35,15 @@ Prometheus client, exposed on port 9100 (`/metrics`) by api, worker, renderer. N
 | `deckforge_stage_duration_seconds` | histogram | stage |
 | `deckforge_jobs_ready` | gauge | kind |
 | `deckforge_job_wait_seconds` | histogram | kind |
-| `deckforge_llm_requests_total` | counter | role, provider, model, status |
+| `deckforge_llm_requests_total` | counter | role, pool, adapter, status |
 | `deckforge_llm_tokens_total` | counter | role, model, kind (input, output, cache_read, cache_write) |
 | `deckforge_llm_latency_seconds` | histogram | role, model |
-| `deckforge_llm_cost_micro_usd_total` | counter | role, model |
+| `deckforge_llm_cost_micro_usd_total` | counter | role, model (internal cost from `config/pricing.yaml`) |
+| `deckforge_pool_budget_wait_seconds` | histogram | pool, priority |
+| `deckforge_pool_degradation_step` | gauge | pool (0 = normal, steps from `22` section 6) |
+| `deckforge_agent_tasks_total` | counter | agent, kind, outcome (result, reject, need, escalate, cancelled) |
+| `deckforge_qa_findings_routed_total` | counter | owner, strategy, outcome (fixed, persisting, regression) |
+| `deckforge_clm_rank_latency_seconds` | histogram | ranker |
 | `deckforge_decisions_total` | counter | decision_id, engine, outcome (accepted, abstained, fallback) |
 | `deckforge_decision_latency_seconds` | histogram | decision_id, engine |
 | `deckforge_tool_calls_total` | counter | tool, status |
@@ -53,7 +58,8 @@ Organisation ids are not metric labels (cardinality). Per-org usage comes from `
 
 1. **Service health**: request rate, error rate, p95 latency per route, queue depth, worker slot usage, renderer busy ratio.
 2. **Runs**: runs per hour by outcome, stage durations, p50 and p95 deck time, repair rounds, QA score distribution, top defect codes.
-3. **LLM**: tokens and cost per role, latency, error and refusal rates, cache read share (prefix caching effectiveness).
+3. **Model pools**: tokens and cost per role and adapter, latency, error and refusal rates, prefix cache hit rate, KV usage, running and waiting requests per replica, adapter swaps, budget waits, degradation step, GPU memory and utilisation (DCGM exporter, `22` section 10).
+6. **Agents**: tasks per agent and outcome, reject and need rates, repair findings by owner and strategy, fixed vs persisting vs regression (`20` section 12, `27`).
 4. **Laya**: decisions per second by id, abstention and fallback rates, latency, audit-sample agreement, answer distribution drift.
 5. **Cache**: hit rate per layer, Valkey memory and evictions.
 
@@ -64,7 +70,10 @@ Organisation ids are not metric labels (cardinality). Per-org usage comes from `
 | ApiErrorRate | 5xx above 2% for 5 min | page |
 | QueueBacklog | `deckforge_jobs_ready{kind="run.execute"}` above 2 x worker slots for 10 min | warn |
 | RunFailureRate | failed runs above 10% over 1 h | page |
-| LLMGatewayErrors | LLM error rate above 5% for 5 min | page |
+| ModelPoolErrors | model pool error rate above 5% for 5 min | page |
+| ModelPoolSaturated | degradation step 2 or higher for 10 min, or vLLM waiting requests above 0 for 5 min | warn |
+| GpuMemoryHigh | DCGM GPU memory above 95% for 5 min | warn |
+| ClmUnavailable | `rank()` fallbacks above 50% for 5 min | warn |
 | LayaUnavailable | Laya decisions with `outcome=fallback` and reason unavailable above 50% for 5 min | warn |
 | LayaDrift | weekly label share shift above 15 points for a decision | info |
 | RendererSaturated | renderer busy above 90% for 10 min | warn |

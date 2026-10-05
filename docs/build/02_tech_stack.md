@@ -34,11 +34,14 @@ Licence check rule: only permissive licences (MIT, BSD, Apache-2.0, ISC, MPL-2.0
 | Checkpointer (server) | langgraph-checkpoint-postgres | 3.1.x | MIT | `AsyncPostgresSaver`, `AsyncPostgresStore` |
 | Checkpointer (lite) | langgraph-checkpoint-sqlite | 3.1.x | MIT | `AsyncSqliteSaver` |
 | LLM abstractions | langchain, langchain-core | 1.4.x, 1.6.x | MIT | `init_chat_model`, `with_structured_output`, prompts, tools, `create_agent` with middleware |
-| OpenAI-compatible models | langchain-openai | 1.6.x | MIT | vLLM, Ollama and LiteLLM endpoints (`ChatOpenAI` with `base_url`) |
-| Anthropic models | langchain-anthropic | 1.7.x | MIT | Official `anthropic` SDK underneath |
+| OpenAI-compatible client | langchain-openai | 1.6.x | MIT | Talks to vLLM, Ollama and llama.cpp servers (`ChatOpenAI` with `base_url`, `extra_body`) |
 | Ollama native (optional) | langchain-ollama | 1.1.x | MIT | Only if the OpenAI-compatible Ollama endpoint misses a feature |
 | MCP client and server | mcp, langchain-mcp-adapters | 2.3.x, 0.3.x | MIT | Expose DeckForge tools, consume customer MCP tools (P7, optional) |
-| Decision engine | laya | 0.3.27 (pin exactly) | Apache-2.0 | System 1 decisions and judges. Extras: `laya[serve]` in the laya image, `laya[onnx]` for CPU laptops |
+| Decision engine | laya | 0.3.27 (pin exactly) | Apache-2.0 | System 1 typed decisions and judges. Extras: `laya[serve]` in the laya image, `laya[onnx]` for CPU laptops |
+| Ranking and verification | contrastive-lm (CLM) | 0.1.0 (pin exactly) | Apache-2.0 | CLM-8B heads over a frozen base Qwen3-8B encoder, `clm-serve` service (`24`, section 2) |
+| Visual decisions | Laya-Vision fork (code only, pinned commit, vendored in the `laya-vision` image) | pinned commit | Apache-2.0 code. Public weights are CC BY-NC-SA, not used | Our `df-laya-vision` checkpoint (`25`, section 4) |
+| Agent interoperability | a2a-sdk | 1.2.x | Apache-2.0 | A2A v1 server and client (`27`, section 9) |
+| Hardware detection | psutil | 7.2.x | BSD-3 | `deckforge doctor` tiers (`22`, section 5) |
 | Embeddings (in-process) | fastembed | 0.8.x | Apache-2.0 | ONNX runtime, no torch, works on all OSes. Default model `BAAI/bge-small-en-v1.5`, multilingual option `intfloat/multilingual-e5-small` |
 | HTTP client | httpx | 0.28.x | BSD | Async calls to Laya, renderer, search, fetch |
 | Retries | tenacity | 9.1.x | Apache-2.0 | Tool and adapter retries outside LangGraph nodes |
@@ -107,7 +110,6 @@ Dev and test only:
 | Database | `pgvector/pgvector:pg17` | PostgreSQL 17, pgvector 0.8 | PostgreSQL, PostgreSQL | One database `deckforge`, schemas `app`, `lg` (LangGraph) |
 | Cache, pub/sub | `valkey/valkey:8` | 8.x | BSD-3 | `maxmemory-policy allkeys-lru` for the cache DB, separate logical DB for rate limits |
 | Object storage (optional) | `chrislusf/seaweedfs` | 3.x | Apache-2.0 | Only in the multi-node profile. Any S3-compatible store works |
-| LLM gateway | `ghcr.io/berriai/litellm` | pin a tested tag | MIT (core) | Virtual keys per org, budgets, rpm/tpm limits, fallbacks |
 | LLM serving (GPU) | `vllm/vllm-openai` | pin a tested tag | Apache-2.0 | `--enable-prefix-caching`, guided JSON for structured output |
 | LLM serving (laptop) | Ollama | latest stable | MIT | macOS, Windows, Linux installers. OpenAI-compatible endpoint at `http://localhost:11434/v1` |
 | Decision engine | `deckforge-laya` (our image, `laya[serve]==0.3.27`) | ours | Apache-2.0 | `laya-serve` on port 8200, internal only |
@@ -117,19 +119,32 @@ Dev and test only:
 
 ## 5. Models
 
-DeckForge never hard-codes a model. Roles map to models in `config/models.yaml` (`07`). Defaults below are starting points, selected finally by the eval harness (T-11.6).
+DeckForge never hard-codes a model. Roles map to models in `config/models.yaml` (`07`). All models are open-weight with permissive licences and run locally (D16).
 
-| Role | On-prem default (vLLM or Ollama) | Cloud profile (Anthropic, opt-in per org) |
+| Model | Base (reference, confirmed by the bake-off T-13.1) | Licence | Serving |
+|---|---|---|---|
+| `df-lm-32b`, `df-lm-14b`, `df-lm-8b` | Qwen3 dense 32B, 14B, 8B, fine-tuned (`19`) | Apache-2.0 base | vLLM (server, FP8, multi-LoRA), Ollama or llama.cpp GGUF (laptops) |
+| Agent adapters (`df-planner`, `df-writer`, ...) | LoRA rank 16 on the merged multitask model | ours | vLLM `--enable-lora` |
+| `df-vlm` | Apache-2.0 vision-language model chosen in the bake-off, fine-tuned for slide critique | Apache-2.0 base | vLLM, GGUF |
+| `df-laya` | `convaiinnovations/laya`, fine-tuned (`09`) | Apache-2.0 | `laya-serve`, ONNX int8 |
+| `df-laya-vision` | Laya-Vision architecture on Apache-2.0 backbones (SmolVLM-256M or SigLIP), trained by us | ours | `laya-vision` service |
+| CLM encoder and heads | base Qwen3-8B (frozen, pooling) + CLM-v0.1-8B heads, fine-tuned heads `df-clm-*` | Apache-2.0 | vLLM `--runner pooling` + `clm-serve` |
+| Embeddings | fastembed `BAAI/bge-small-en-v1.5` | MIT | in process |
+| Teachers (training only) | gpt-oss-120b or Qwen3-235B-A22B | Apache-2.0 | vLLM offline batch on the training host |
+
+## 5a. Training stack (training host only, `19`, `24`)
+
+| Purpose | Library | Version |
 |---|---|---|
-| `planner` | Strongest open-weight instruct model the GPU host fits with at least 64k context and reliable JSON-schema output (candidates to evaluate: gpt-oss-120b, Qwen3 large MoE, Llama large instruct) | `claude-opus-5-5`, effort `high` |
-| `writer` | Same model as `planner` (one model keeps one prefix cache) | `claude-opus-5-5`, effort `medium` |
-| `extractor` | Same model, or a smaller instruct model if latency demands it | `claude-opus-5-5`, effort `low` |
-| `judge` | Same model as `planner` | `claude-opus-5-5`, effort `low` |
-| `vision_judge` | Open-weight vision-language model (candidates: Qwen VL family, Llama vision) | `claude-opus-5-5`, effort `medium` |
-| `embed` | fastembed `BAAI/bge-small-en-v1.5` in-process | same (embeddings stay local) |
-| Laya | `convaiinnovations/laya` and `laya-multilingual` as bases, fine-tuned DeckForge checkpoint `df-laya-v1` after P11 | same (Laya always local) |
-
-Using cheaper Anthropic models (`claude-sonnet-5-5`, `claude-haiku-4-5`) for some roles is a founder decision after the eval harness shows quality holds. Lowering `effort` on `claude-opus-5-5` is the first cost lever.
+| Fine-tuning | transformers, trl, peft, accelerate, datasets | 5.18.x, 1.14.x, 0.21.x, 1.15.x, 5.0.x |
+| Multi-GPU | deepspeed (ZeRO-3) or torch FSDP | 0.19.x, torch 2.14.x |
+| Quantised training | bitsandbytes | 0.50.x |
+| Kernels | liger-kernel, flash-attn | 0.8.x, 2.8.x |
+| Rollouts and teacher generation | vllm | 0.30.x |
+| Quantised exports | llmcompressor (FP8, AWQ), llama.cpp convert and quantize (pinned commit), gguf | 0.14.x, pinned, 0.19.x |
+| Dedupe | datasketch | 2.0.x |
+| General-skill evals | lm-eval | 0.4.x |
+| Experiment tracking | mlflow (self-hosted) | 3.16.x |
 
 ## 6. Cross-platform notes (apply everywhere)
 
@@ -143,4 +158,4 @@ Using cheaper Anthropic models (`claude-sonnet-5-5`, `claude-haiku-4-5`) for som
 | Fonts | Bundled in `deckforge/fonts/` (Liberation Sans, Gelasio, Carlito, Caladea and the families' display fonts, all OFL or Apache). Metrics read from these files |
 | File names | Uploaded file names are display-only. Stored keys use UUIDs to avoid Windows reserved names and path length limits |
 | Line endings | `.gitattributes` sets `* text=auto eol=lf`. Generated files write `\n` |
-| Torch | Only the optional `laya` extra pulls torch. Lite mode without it sets `DF_LAYA_MODE=off` and decisions fall back to LLM or deterministic defaults |
+| Torch | Only the optional `laya` extra pulls torch. Lite mode without it sets `DF_LAYA_MODE=off` and decisions fall back to LLM or deterministic defaults. The training stack is never installed in the app image |

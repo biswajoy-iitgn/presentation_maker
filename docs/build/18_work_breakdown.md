@@ -20,7 +20,7 @@ Sizes are effort estimates for one implementing agent. They are planning numbers
 | P0 Foundation | Cross-platform base: env, settings, fonts, ports, fakes, CI on three OSes | `uv run poe check` green on macOS, Windows, Linux CI | none (first) |
 | P1 Persistence and auth | Database, blobs, API skeleton, auth, projects, files, briefs | Create a user, log in, create a project, upload the example xlsx, create a brief through the API | P3 after T-1.1 |
 | P2 Jobs, events, runs | Queue, worker, events, runs API, SSE, rate limits, file profiling, lite single process | Create a run that executes a dummy graph, watch SSE events, cancel and resume | P3 |
-| P3 LLM layer | Model registry, prompts, structured output, caches, credentials | `deckforge llm try planning.frame_problem --brief examples/...` returns a validated `ProblemOut` from Ollama or vLLM | P2 |
+| P3 LLM layer | Model registry, local backends, ModelPool router, prompts, structured output, caches, credentials | `deckforge llm try planning.frame_problem --brief examples/...` returns a validated `ProblemOut` from Ollama or vLLM (base open model until DeckForge-LM exists) | P2 |
 | P4 Deck graph v1 | LLM planner and composer, deterministic render, QA Tier 0, decisions on fallbacks | Example brief to PPTX end to end through the API with a local model, plan review interrupt in between | P5 from T-4.3 |
 | P5 Laya integration | Decision engine, policies, shadow mode, question catalogue, state builders, Laya service | Same run with Laya in shadow mode: decision_log shows paired Laya and fallback answers | P6 |
 | P6 Evaluators and repair | Tier 0 to 3 cascade, renderer service, repair loop, slide regeneration | Deck with an injected bad title is repaired automatically, QA report shows before and after | P7, P8 |
@@ -29,9 +29,15 @@ Sizes are effort estimates for one implementing agent. They are planning numbers
 | P9 Frontend | Full SPA | Non-technical user completes the whole flow in the browser | P10 |
 | P10 Packaging and deployment | Images, compose, nginx, observability, lite installers, CI | Fresh Linux server up with one command, three-OS lite smoke green | P11 |
 | P11 Learning loop | Laya fine-tuning, calibration, promotion, eval harness | First `df-laya-v1` promoted for at least three decisions on measured gates | P12 |
-| P12 Hardening and scale | Security suite, load tests, backups, Helm, air-gapped bundle, installers | Release candidate checklist complete | none (last) |
+| P12 Hardening and scale | Security suite, load tests, backups, Helm, air-gapped bundle, installers, index and partition work | Release candidate checklist complete | P13 to P18 |
+| P13 DeckForge-LM | Base model bake-off, data engine, SFT, DPO, GRPO, distillation, exports, CLM heads, `df-vlm`, counterfactual replay (`19`, `24`) | `df-lm-v1` passes the gates in `19` section 6 and replaces the base model on the reference server | P14, P15 |
+| P14 Memory and performance | Memory calculator, admission control, degradation ladder, benchmarks, GPU scheduler (`22`) | 4 x 80 GB reference holds 64 concurrent sequences with no OOM and no vLLM preemption at the target load | P13 |
+| P15 Agents and protocol | Agent cards, DAP envelope, blackboard, dependency graph, `qa_router`, supervisor and W2, transports, A2A (`20`, `27`) | The P6 demo runs through agents: a bad title goes to copywriter, a label collision to repair_specialist, a wrong number to data_analyst, each fixed and traced | P16, P17 |
+| P16 Visual inspector | L2 geometry, L3 pixels, L4 Laya-Vision, L5 regions, L6 clicks, L7 flows (`25`) | A deck with injected overlap, low contrast, off-grid and broken-link defects gets each one found with a bounding box and fixed by its owner | P15 |
+| P17 Knowledge base | Card schema, import, build, retrieval modes, DS cards as standards registry, evals, org cards (`28`) | Plan report cites framework, exhibit and standard card ids for every choice, and the KB retrieval eval passes | P15 |
+| P18 Product stories and data | Later tables, revisions, variants, diff, comments, review links, notifications, exports (`23`, `26`) | A reviewer comments on a shared link, the comment becomes a revision, the editor approves the new version | P16, P17 |
 
-Critical path: P0, P1, P2, P4, P6, P10. P3 feeds P4. P5 and P11 are the Laya track. P9 can start once P2's API contracts are stable (after T-2.5) using the generated OpenAPI types.
+Critical path: P0, P1, P2, P4, P6, P10. P3 feeds P4. P5 and P11 are the Laya track. P9 can start once P2's API contracts are stable (after T-2.5) using the generated OpenAPI types. P13 (model training) starts as soon as P4 produces traces and runs on vendor GPUs in parallel with P6 to P10. Until `df-lm-v1` passes its gates, every role runs on the base open model with the same prompts, so nothing in P4 to P10 waits for training. P15 re-wraps the P4 to P6 nodes as agents without changing their contracts.
 
 ---
 
@@ -41,7 +47,7 @@ Critical path: P0, P1, P2, P4, P6, P10. P3 feeds P4. P5 and P11 are the Laya tra
 Depends on: none
 Files: ~`pyproject.toml`, +`uv.lock`, +`.gitattributes`, +`.env.example`, ~`.gitignore`
 Steps:
-1. Set `requires-python = ">=3.12"`. Keep the existing base dependencies and add the base set from `02` section 2 that both modes need (fastapi, uvicorn[standard], sse-starlette, python-multipart, pydantic-settings, sqlalchemy[asyncio], alembic, langgraph, langchain, langchain-core, langchain-openai, langchain-anthropic, fastembed, httpx, tenacity, jinja2, pyyaml, pandas, openpyxl, pyarrow, pypdfium2, pdfplumber, python-docx, trafilatura, filetype, defusedxml, pyjwt, argon2-cffi, authlib, cryptography, structlog, opentelemetry-sdk, opentelemetry-exporter-otlp, the three instrumentation packages, prometheus-client, platformdirs, orjson, xxhash, fonttools). Pin with `==X.Y.*`.
+1. Set `requires-python = ">=3.12"`. Keep the existing base dependencies and add the base set from `02` section 2 that both modes need (fastapi, uvicorn[standard], sse-starlette, python-multipart, pydantic-settings, sqlalchemy[asyncio], alembic, langgraph, langchain, langchain-core, langchain-openai, fastembed, httpx, tenacity, jinja2, pyyaml, pandas, openpyxl, pyarrow, pypdfium2, pdfplumber, python-docx, trafilatura, filetype, defusedxml, pyjwt, argon2-cffi, authlib, cryptography, structlog, opentelemetry-sdk, opentelemetry-exporter-otlp, the three instrumentation packages, prometheus-client, platformdirs, orjson, xxhash, fonttools). Pin with `==X.Y.*`.
 2. Add extras exactly as in `03` section 6. Add `[project.scripts] deckforge = "deckforge.cli:main"`.
 3. Add `[tool.poe.tasks]` for every command in `03` section 5 (use `poe` sequences and `cmd` entries, no shell-specific syntax).
 4. Add ruff config (line length 120, rules from `03` section 3) and mypy config (strict for the listed packages).
@@ -307,11 +313,11 @@ Done when:
 
 ### T-3.1 Model config and registry          Size: M
 Depends on: T-0.5
-Files: +`config/models.yaml`, +`config/pricing.yaml`, +`deckforge/llm/config.py`, +`deckforge/llm/registry.py`, +`deckforge/llm/adapters/openai_compat.py`, tests
-Steps: Pydantic models for the YAML (`07` section 3.1) with `${VAR:-default}` interpolation. `ModelRegistry.chat_model(role, org)` picks the profile (org `model_profile`, else default per mode), refuses `anthropic` providers unless `DF_ALLOW_CLOUD_LLM` and the org setting allow it (`CloudLLMDisabled`). `OpenAICompatAdapter` builds `ChatOpenAI(base_url, api_key, model, max_tokens, temperature, timeout, max_retries=0)` (retries are ours).
-Tests: profile selection, cloud gate, interpolation, cached instances per (profile, role).
+Files: +`config/models.yaml`, +`config/model_pools.yaml`, +`config/pricing.yaml`, +`deckforge/llm/config.py`, +`deckforge/llm/registry.py`, tests
+Steps: Pydantic models for the YAML (`07` section 3) with `${VAR:-default}` interpolation: roles (model role, default adapter, thinking flag, max tokens, temperature), profiles (`server`, `laptop`, `test`), `agent_adapters` (agent id to adapter name), backends (`vllm_pool`, `ollama`, `llamacpp`, `fake`). `ModelRegistry.chat_model(role, adapter=None, org=...)` picks the profile (org `model_profile`, else default per mode), resolves the adapter (explicit, else the agent's adapter, else the multitask model) and returns a cached chat model per (profile, role, adapter). There are no cloud providers and no cloud gate (D16).
+Tests: profile selection, adapter resolution order, interpolation, thinking flag mapped to `extra_body={"chat_template_kwargs": {"enable_thinking": ...}}` for vLLM, cached instances per key.
 Done when:
-- [ ] `deckforge llm ping --role planner` sends a one-line request to the configured endpoint (manual, documented).
+- [ ] `deckforge llm ping --role planner` sends a one-line request to the configured local endpoint (manual, documented).
 
 ### T-3.2 Prompt files, loader and renderer          Size: M
 Depends on: T-3.1
@@ -324,18 +330,22 @@ Done when:
 ### T-3.3 Structured calls, repair, usage          Size: L
 Depends on: T-3.2, T-1.1
 Files: +`deckforge/llm/call.py`, +`deckforge/llm/usage.py`, +`deckforge/llm/errors.py`, tests
-Steps: implement `structured()`, `text()`, `vision()` per `07` section 4, `UsageCallback` writing `llm_calls` and usage, error mapping to `ProviderError`, per-role semaphores (`asyncio.Semaphore` sized from `07` section 2), timeouts.
+Steps: implement `structured()`, `text()`, `vision()` per `07` section 4, `UsageCallback` writing `llm_calls` and usage, error mapping to `ProviderError`, pool reservation through `ModelPool.reserve()` before each call and release after (T-3.4), timeouts.
 Tests (with FakeLLM and a fake chat model that returns invalid JSON first): repair path, schema failure raises `ValidationFailed`, timeout maps to retryable error, usage rows written with token counts.
 Done when:
 - [ ] Coverage of `call.py` at least 90%.
 
-### T-3.4 Anthropic adapter          Size: M
+### T-3.4 Local backends and ModelPool router          Size: L
 Depends on: T-3.3
-Files: +`deckforge/llm/adapters/anthropic.py`, tests
-Steps: build `ChatAnthropic(model=..., max_tokens=..., output_config={"effort": spec.effort}, betas=[...], anthropic_api_url=...)` without `temperature`. Structured output always `method="json_schema"`. Refusal handling: inspect `response_metadata["stop_reason"]`, map `refusal` to `ProviderError(code="refusal", retryable=False)`. Server-side fallback: try passing `fallbacks="default"` with beta `server-side-fallback-2026-07-01`. Write a recorded-request test using `respx` to assert the outgoing JSON contains `output_config.effort`, no `temperature`, no `tool_choice` of type `any` or `tool`, and the beta header. If `langchain-anthropic` cannot send `fallbacks`, implement that request path with the `anthropic` SDK directly inside the adapter and record a decision.
-Tests: the recorded-request assertions above, refusal mapping, cache_control placement on the stable prefix (one breakpoint after house rules, one after run context, at most 4).
+Files: +`deckforge/llm/backends/vllm_pool.py`, `ollama.py`, `llamacpp.py`, +`deckforge/llm/pool.py` (ModelPool), +`deckforge/llm/pool_metrics.py`, +`deckforge/llm/budget.lua`, tests
+Steps:
+1. `VllmPoolBackend` builds `ChatOpenAI(base_url=<replica>, api_key=<pool key>, model=<adapter or base name>, max_retries=0, extra_body=...)`. Tool calls use the hermes parser that the replicas run with. Structured output uses JSON schema mode.
+2. `ModelPool` per `22` section 6.1: reads each replica's `/metrics` every 5 s (`vllm:kv_cache_usage_perc`, `vllm:num_requests_running`, `vllm:num_requests_waiting`), routes by load with adapter affinity and run (prefix) affinity, marks a replica down after 3 failed scrapes.
+3. Token budget reservation per `22` section 6.2: `reserve(pool, priority, est_tokens)` runs `budget.lua` in Valkey (lite: in-process counter), release returns unused tokens. Priority classes: interactive, run, background.
+4. `OllamaBackend` and `LlamaCppBackend` for laptops (OpenAI-compatible endpoints, JSON schema format, model names from the laptop profile).
+Tests: router picks the least loaded replica, affinity wins within a load band, down replica skipped, budget reservation and release with a fake Valkey, backend request shapes recorded with respx.
 Done when:
-- [ ] Tests pass without network. A manual smoke against the real API is documented for when a key is available.
+- [ ] Two fake replicas behind the pool share 100 concurrent requests within 10% of each other in a unit test, and a dead replica gets no traffic after 15 s.
 
 ### T-3.5 Cache adapters and LLM response cache          Size: M
 Depends on: T-0.7, T-3.3
@@ -351,7 +361,7 @@ Files: +`deckforge/security/crypto.py`, +`deckforge/security/credentials.py`, ~`
 Steps: AES-256-GCM encrypt and decrypt with associated data `org_id|provider`, `CredentialStore.get(org, provider)` falls back to install-wide env keys. Admin endpoints from `05` section 3.2. `deckforge secrets init|rotate`.
 Tests: round trip, tampered ciphertext fails, rotation re-encrypts.
 Done when:
-- [ ] Anthropic adapter reads its key through the store.
+- [ ] Search and connector adapters read their keys through the store. The model pool key is read from the `pool_key` secret file, never from the database.
 
 ### T-3.7 FakeLLM and fixtures          Size: S
 Depends on: T-3.3
@@ -399,7 +409,7 @@ Done when:
 
 ### T-4.5 Knowledge base and vector stores          Size: M
 Depends on: T-1.2, T-0.7
-Files: +`deckforge/knowledge/frameworks.py` (parse `docs/FRAMEWORK_LIBRARY.md` into cards), +`deckforge/knowledge/embed.py` (fastembed wrapper), +`deckforge/storage/vectors_pg.py`, `vectors_numpy.py`, CLI `deckforge kb build`, tests
+Files: +`deckforge/knowledge/frameworks.py` (parse `docs/FRAMEWORK_LIBRARY.md` into cards, later replaced by the card importer in T-17.1), +`deckforge/knowledge/embed.py` (fastembed wrapper), +`deckforge/storage/vectors_pg.py`, `vectors_numpy.py`, CLI `deckforge kb build`, tests
 Steps: parse the library into `FrameworkCard(id, name, family, when_to_use, message_types, data_needed, exhibit_hints)`. Embed `name + when_to_use`. Upsert into `kb_items` namespace `frameworks`. Numpy store loads vectors from `vector_json`, cosine top-k. pgvector store with HNSW cosine query.
 Tests: parser covers every entry in the library (count matches), search for "margin decline drivers" returns a bridge-type framework in the top 5.
 Done when:
@@ -566,13 +576,13 @@ Tests: chart XML contains embedded workbook and expected series, colours from th
 Done when:
 - [ ] Example waterfall renders natively and passes lint when the setting is on.
 
-### T-6.7 Repair router and strategies          Size: L
+### T-6.7 QA router and repair strategies          Size: L
 Depends on: T-6.2
-Files: +`deckforge/graphs/nodes/repair_nodes.py`, +`deckforge/evaluators/repairs.py`, +`prompts/repair/{rewrite_title,rewrite_commentary,shorten}.md`, tests
-Steps: strategies from `09` section 7, default mapping, `D_REPAIR_STRATEGY` for multi-option codes, deterministic first then LLM in parallel per slide, `repair_round` increment, return to render.
-Tests: each strategy on a fixture defect clears it after re-QA, loop stops at max rounds.
+Files: +`deckforge/graphs/nodes/qa_router.py`, +`deckforge/evaluators/repairs.py`, +`deckforge/evaluators/owners.py`, +`prompts/repair/{rewrite_title,rewrite_commentary,shorten}.md`, tests
+Steps: strategies and owners from `09` section 7. Router steps 1 to 8 from `27` section 8.3: filter, dedupe by fingerprint, owner (provenance, standard default, `D_DEFECT_OWNER`), strategy (standard first, else `D_REPAIR_STRATEGY`), group per (owner, slide), deterministic first then LLM in parallel per slide, re-render, classify fixed, persisting, new. In P6 the owners are the existing composer steps called as functions. T-15.6 replaces them with agent tasks without changing the router's input or output.
+Tests: each strategy on a fixture defect clears it after re-QA, owner resolution order, loop stops at max rounds, a regression reverts the artefact.
 Done when:
-- [ ] P6 exit demo works (bad title repaired, report shows before and after).
+- [ ] P6 exit demo works (bad title repaired, report shows before and after, each fix names its owner).
 
 ### T-6.8 QA report persistence and events          Size: S
 Depends on: T-6.2
@@ -636,7 +646,7 @@ Done when:
 ### T-7.6 Research agent          Size: L
 Depends on: T-7.3, T-7.4, T-7.5
 Files: +`deckforge/graphs/research.py`, +`prompts/research/agent.md`, `extract_facts.md`, ~`deck.py` (fan-out and merge), tests
-Steps: `08` section 6 (agent construction, limits, citation verification by quote matching, fallbacks to dummy, merge into exhibit data and facts with `source=research`).
+Steps: `08` section 6 (agent construction with the `df-researcher` adapter when present, limits, citation verification by quote matching, fallbacks to dummy, merge into exhibit data and facts with `source=research`).
 Tests: FakeSearch plus FakeLLM scripted agent produces findings with verified quotes, an unverifiable quote is rejected, research disabled path.
 Done when:
 - [ ] P7 exit demo with fixtures in CI and with SearXNG plus a local model manually.
@@ -655,6 +665,30 @@ Files: +`deckforge/tools/mcp_server.py`, +`deckforge/tools/mcp_client.py`, CLI `
 Steps: `08` section 7.
 Done when:
 - [ ] An MCP client lists DeckForge tools and creates a run with an API key.
+
+### T-7.9 Tool sandbox mode and recordings          Size: M
+Depends on: T-7.1, T-7.3
+Files: +`deckforge/tools/sandbox.py`, +`training/sandbox/recordings/`, CLI `deckforge tools record|replay`, tests
+Steps: `21` section 4. External tools (`web_search`, `fetch_url`, `image_search`) run against recorded responses keyed by normalised arguments. Recording mode stores request, response, timestamp and licence note. Replay mode never touches the network and returns `status="not_recorded"` for unknown keys. Training environments and tool benchmarks use replay only.
+Tests: record then replay returns identical results, unknown key path, no socket opened in replay mode (socket guard fixture).
+Done when:
+- [ ] The research agent test suite runs fully on recordings with the network disabled.
+
+### T-7.10 Tool benchmark          Size: M
+Depends on: T-7.9, T-7.5
+Files: +`evals/tools/*.yaml`, +`deckforge/evals/tools.py`, CLI `deckforge eval --suite tools`
+Steps: `21` section 6.2. At least 20 tasks per tool group with the expected tool, expected argument constraints and the expected outcome. Metrics: tool selection accuracy, argument validity, task success, calls per task, Laya and CLM shortlist recall. Report per tool and per group, compared with the last release.
+Tests: scoring functions on hand-made traces.
+Done when:
+- [ ] Benchmark report for the base model committed under `evals/reports/tools/`.
+
+### T-7.11 Tool description optimisation loop          Size: M
+Depends on: T-7.10
+Files: +`training/tools/describe_opt.py`, job `train.tool_descriptions`, tests
+Steps: `21` section 7.2. For tools below their selection-accuracy target, generate 8 description variants with the planner role, run the benchmark on each (replay mode), keep the best only if it beats the current one by at least 2 points on the held-out split and does not lower any other tool's accuracy by more than 1 point. Output a PR-ready diff of the tool spec description and the report.
+Tests: selection rule on synthetic scores, held-out split never used for choosing.
+Done when:
+- [ ] One loop run on two weak tools produces a report and a description diff.
 
 ---
 
@@ -742,7 +776,7 @@ Done when:
 ### T-9.7 Admin pages          Size: M
 Depends on: T-9.1, T-1.7, T-1.6, T-3.6
 Files: `frontend/src/features/admin/*`
-Steps: members and roles, API keys (show once dialog), provider credentials (write-only fields), org settings (cloud LLM toggle with a data-flow warning, research toggle, retention), usage chart (SVG), audit log table, decision policies (read-only view with metrics).
+Steps: members and roles, API keys (show once dialog), provider credentials (write-only fields), org settings (data policies: `allow_training`, `allow_exploration`, research toggle, retention, with the data processing record from `15`), model and adapter versions in use (read-only), usage chart (SVG), audit log table, decision policies (read-only view with metrics).
 Done when:
 - [ ] Owner can invite an editor and create an API key in the browser.
 
@@ -771,13 +805,13 @@ Steps: files exactly as `14` sections 2 and 3. `deckforge secrets init --dir dep
 Done when:
 - [ ] On a fresh Linux VM: `deckforge secrets init`, `docker compose up -d` (core profile), browse to https, log in, complete a run with an Ollama or vLLM endpoint.
 
-### T-10.3 LiteLLM gateway and org virtual keys          Size: S
-Depends on: T-10.2, T-3.6
-Files: +`deploy/litellm/config.yaml`, +`deckforge/llm/gateway_keys.py`, tests
-Steps: config from `14` section 2.3, create a virtual key per org on org creation (and a backfill command), store encrypted, use in `OpenAICompatAdapter` when the gateway is configured.
-Tests: respx mock of LiteLLM key API.
+### T-10.3 Model pull, registry and serving profiles          Size: M
+Depends on: T-10.2, T-3.4
+Files: +`deckforge/models/pull.py`, +`deckforge/models/manifest.py`, CLI `deckforge models pull|verify|list`, ~`deploy/compose/docker-compose.yml` (GPU profile services from `14` section 2), tests
+Steps: a signed model manifest (name, version, files, sha256, licence) per release of `df-lm`, adapters, `df-vlm`, `df-laya`, `df-laya-vision`, CLM heads and the base CLM encoder. `pull` downloads into `/models` (server) or the platform data dir (lite) with resume and hash checks, `verify` re-hashes, air-gapped installs import a tarball. Writes `model_registry` rows. Ollama profile: `ollama create` from the GGUF and Modelfile in the bundle.
+Tests: manifest signature check, hash mismatch fails, resume after interruption (fake server).
 Done when:
-- [ ] Org budget exhaustion at the gateway surfaces as `QUOTA_EXCEEDED` in the run.
+- [ ] On a GPU server, `deckforge models pull --release <v>` then `docker compose --profile gpu up -d` serves all model services and `deckforge llm ping` succeeds for every role.
 
 ### T-10.4 Observability          Size: M
 Depends on: T-2.2
@@ -835,7 +869,7 @@ Done when:
 ### T-11.3 Corpus positives, teacher labels, production export          Size: L
 Depends on: T-11.1, T-6.2
 Files: +`training/sources/corpus.py`, `teacher.py`, `production.py`, job kind `eval.run` reuse
-Steps: S2 from corpus slide descriptions. S3 teacher labelling with 3 samples and unanimity filter (job runs on the eval host with the strongest available judge model). S4 export from `decision_log` (install-local, respects `allow_training`).
+Steps: S2 from corpus slide descriptions. S3 teacher labelling with 3 samples and unanimity filter (job runs on the eval host with the open teacher models allowed by D18, never a closed API). S4 export from `decision_log` (install-local, respects `allow_training`).
 Done when:
 - [ ] Dataset summary per decision id (counts by source and label) generated.
 
@@ -932,9 +966,424 @@ Done when:
 
 ---
 
+### T-12.10 Query plan and index test          Size: M
+Depends on: T-1.2, T-18.1
+Files: +`tests/integration/db/test_query_plans.py`, +`tests/integration/db/seed_large.py`
+Steps: seed a PostgreSQL test database with production-like volumes (`23` section 1 sizes, scaled to 10 orgs and 50k runs). For each query Q1 to Q16 in `23` section 2, run `EXPLAIN (FORMAT JSON)` and fail when a table above 10k rows shows a sequential scan, or when the plan's estimated cost is above the recorded baseline by 50%.
+Tests: the test itself, run in the nightly CI job with the `pgvector/pgvector:pg17` service.
+Done when:
+- [ ] All Q1 to Q16 plans use their indexes. Baselines committed.
+
+### T-12.11 Telemetry partitioning and buffered writer          Size: M
+Depends on: T-1.2, T-10.7
+Files: +`migrations/versions/*_partition_telemetry.py`, +`deckforge/db/partitions.py`, +`deckforge/db/telemetry_writer.py`, job `db.partitions`, tests
+Steps: `23` sections 4 and 7. Convert `run_events`, `decision_log`, `llm_calls`, `tool_calls`, `agent_traces`, `agent_messages`, `audit_log` and `usage_ledger` to monthly range partitions on `created_at`. The daily `db.partitions` job creates the next 2 months and detaches, exports (parquet) and drops partitions past retention. `TelemetryWriter` buffers rows in-process and flushes every 200 ms or 500 rows with `COPY` (server) or `executemany` (lite), and flushes on shutdown. Run state tables are never buffered.
+Tests: partitions created ahead, retention drop, writer flush on size and on time, flush on shutdown, crash loses at most the buffer.
+Done when:
+- [ ] Load test (T-12.3) shows telemetry inserts below 5% of database CPU at the target run rate.
+
+---
+
+## P13 DeckForge-LM
+
+Training tickets run on vendor GPUs (`19` section 8). Every training script is deterministic given a seed and a dataset version, logs to MLflow (T-13.11) and writes a report under `evals/reports/`.
+
+### T-13.1 Base model bake-off          Size: L
+Depends on: T-4.10, T-7.10
+Files: +`training/bakeoff/run.py`, +`training/bakeoff/candidates.yaml`, +`evals/reports/bakeoff/`, decision record `docs/decisions/DR-xxx-base-model.md`
+Steps: candidates and criteria from `19` section 2 (Qwen3 dense, gpt-oss, Mistral Small, plus a VLM shortlist for `df-vlm`). Verify each licence text from the model card and record it. Serve each candidate with the pinned vLLM, run the agent suites, 30 golden briefs, the tool benchmark and the latency and memory probes with the same prompts. Score with the weights in `candidates.yaml`.
+Tests: none new (evaluation ticket). The scoring script has unit tests for weighting and ties.
+Done when:
+- [ ] Decision record names the base family and the `df-vlm` base with the scores table, licence evidence and the runner-up.
+
+### T-13.2 Training data engine C1 to C7          Size: L
+Depends on: T-13.1, T-11.1
+Files: +`training/data_engine/{c1_corpus.py,c2_briefs.py,c3_teacher.py,c4_self.py,c5_repairs.py,c6_feedback.py,c7_public.py}`, ~`training/DATA_REGISTER.md` (data register with licences), +`training/data_engine/filters.py`, tests
+Steps: `19` section 4. C1 corpus inversion pipeline, C2 synthetic briefs with code-generated data, C3 teacher trajectories with rejection sampling (open teachers only, D18), C4 best-of-N self runs, C5 repair pairs, C6 install-local feedback when `allow_training` is on, C7 public datasets from the register. Filters from `19` section 4.6 in order: schema, verifiable checks, MinHash dedupe, decontamination against `evals/` and gold sets, PII scrub, length, balance, licence register. Output JSONL in the formats of `19` section 4.7 with a dataset version.
+Tests: each source produces valid records on a small fixture, decontamination removes a planted eval item, licence filter drops a record from an unlisted source.
+Done when:
+- [ ] Dataset card with counts per source, agent and task type for dataset `v1`.
+
+### T-13.3 Agent traces table, writer and dataset builders          Size: M
+Depends on: T-1.2, T-12.11
+Files: +`migrations/versions/*_agent_traces.py`, +`deckforge/agents/traces.py`, +`training/builders/{sft.py,dpo.py,grpo.py}`, tests
+Steps: table `app.agent_traces` from `23` section 3 (partitioned). `TraceWriter` writes one row per agent invocation with inputs, outputs, model and tool calls, decisions, verdicts and outcome, through the buffered telemetry writer. Builders turn traces into SFT examples (accepted outputs), DPO pairs (rejected attempt then accepted fix on the same task) and GRPO prompts with reward specs (`20` section 10.1).
+Tests: trace round trip, builder outputs validate against the formats, PII flag respected.
+Done when:
+- [ ] A golden-brief run produces traces for every agent and the builders emit at least one example of each kind.
+
+### T-13.4 Stage 1 multitask SFT          Size: L
+Depends on: T-13.2, T-13.3
+Files: +`training/lm/sft.py`, +`training/lm/configs/sft_*.yaml`, job `train.lm_sft`
+Steps: `19` section 5.1. TRL `SFTTrainer` with PEFT LoRA r32 on all linear layers, task mixture weights from the config, chat template of the base, completion-only loss, packing off for tool trajectories. Merge the adapter into the base for serving (`df-lm-<size>-v1.0`).
+Tests: a 50-step smoke run on a tiny model in CI (CPU) checks the pipeline end to end.
+Done when:
+- [ ] `df-lm-32b-v1.0` candidate trained, agent suites run, report committed.
+
+### T-13.5 Stages 2 and 3: DPO and GRPO with verifiable rewards          Size: L
+Depends on: T-13.4, T-7.9
+Files: +`training/lm/dpo.py`, +`training/lm/grpo.py`, +`training/lm/rewards/*.py`, +`training/lm/envs/{research_env.py,repair_env.py,data_env.py}`, tests
+Steps: `19` sections 5.2 and 5.3, `21` section 5.2. DPO on C5 and C4 pairs. GRPO with `num_generations=8`, rewards from the agent cards (schema, fact tokens, fits, action title, title supported, banned phrases, length), tool environments in replay mode, KL and reward hacking checks from `24` section 8.
+Tests: every reward function has unit tests with passing and failing examples, environments reset deterministically.
+Done when:
+- [ ] DPO and GRPO candidates beat the SFT candidate on at least two agent suites with no gate regression.
+
+### T-13.6 Distillation, exports and measured hardware          Size: L
+Depends on: T-13.5
+Files: +`training/lm/distill.py`, +`training/lm/export.py`, ~`19` section 8 (replace estimates with measurements)
+Steps: `19` sections 5.4 and 7. Distil 32B to 14B and 8B on teacher outputs over the full task mix. Export FP8 (server), AWQ 4-bit (24 GB GPUs), GGUF Q4_K_M, Q5_K_M and Q8_0 (laptops) with Modelfiles. Record GPU hours, wall time and memory per stage.
+Tests: export round trip loads in vLLM and llama.cpp and answers a fixed prompt identically at temperature 0 within tolerance.
+Done when:
+- [ ] Size and quantisation bars in `19` section 6 met, measured table committed in `19` section 8.
+
+### T-13.7 DF-LM gates, registry, shadow and promotion          Size: M
+Depends on: T-13.6, T-11.5
+Files: +`deckforge/models/promotion_lm.py`, CLI `deckforge lm promote|rollback`, Grafana panels
+Steps: `19` sections 6 and 9. Run the gate suite, write `model_registry` rows, run shadow on eval traffic (10% of eligible calls), compare rewards, switch role mappings in `config/models.yaml` on promotion, rollback command.
+Tests: gate evaluation on synthetic reports, role mapping switch and rollback.
+Done when:
+- [ ] P13 exit demo: `df-lm-v1` promoted on the reference server with the gate report.
+
+### T-13.8 Counterfactual replay engine          Size: L
+Depends on: T-4.3, T-13.3
+Files: +`deckforge/replay/sample.py`, `fork.py`, `utility.py`, +`config/utility.yaml`, CLI `deckforge replay sample|run|label`
+Steps: `24` section 3.2. Sample checkpoints just before a decision, fork once per option with `aupdate_state` and `astream(None, forked_config)`, run to the end with Fake renderer timing off, compute utility from `config/utility.yaml`, write labels for Laya and CLM heads. Runs only on internal eval briefs.
+Tests: fork produces independent branches, utility computation, labels written with the source checkpoint id.
+Done when:
+- [ ] 500 replays for `D_REPAIR_STRATEGY` produce labels and a report of option win rates.
+
+### T-13.9 CLM heads and clm-serve integration          Size: M
+Depends on: T-13.8, T-17.2
+Files: +`deckforge/decisions/clm.py` (`HttpClm`), +`training/clm/train_heads.py`, +`training/clm/configs/*.yaml`, tests
+Steps: `09` section 10 and `24` section 5. Implement `rank()` on the `DecisionEngine` port through `POST /v1/rank` with the pgvector cosine fallback. Train the six heads on the frozen base encoder, evaluate against the gates in `09` section 10.2, register candidates. Upload candidate set embeddings on each `kb_version` and registry change.
+Tests: `HttpClm` contract tests with recorded fixtures, fallback on outage, candidate set version invalidates the cache.
+Done when:
+- [ ] `framework-rank` and `verifier` pass their gates and run in shadow.
+
+### T-13.10 df-vlm fine-tune          Size: L
+Depends on: T-13.1, T-16.1
+Files: +`training/vlm/sft.py`, +`training/vlm/data.py`, +`training/vlm/configs/*.yaml`
+Steps: `25` sections 5 and 8. Data from rendered golden and perturbed slides with geometry ground truth (boxes from L2) and rubric labels. SFT with LoRA on the chosen VLM base, then merge and export FP8 and GGUF.
+Tests: data builder produces boxes that match the PDF geometry on a fixture slide.
+Done when:
+- [ ] Region recall on the visual defect set at least 0.85 with box IoU at least 0.5, report committed.
+
+### T-13.11 Experiment tracking and the monthly cycle          Size: M
+Depends on: T-13.7
+Files: +`deploy/compose/mlflow.yml` (training host only), +`training/cycle.py`, job `train.cycle`
+Steps: MLflow tracking for every training job (params, dataset version, metrics, artefacts). `train.cycle` runs `19` section 10 steps 1 to 6 as a pipeline with manual approval before promotion.
+Done when:
+- [ ] One full cycle executed with all runs visible in MLflow and the promotion decision recorded.
+
+---
+
+## P14 Memory and performance
+
+### T-14.1 Memory calculator from model configs          Size: M
+Depends on: T-3.1
+Files: +`deckforge/models/memory.py`, CLI `deckforge mem plan --hardware <file>`, tests
+Steps: formulas in `22` section 2 computed from each served model's `config.json` (layers, KV heads, head dim, hidden and intermediate sizes) and the dtype flags. Output per GPU: weights, LoRA slots, KV capacity in tokens, concurrent sequences at a given context, and the sum check against 0.95. Fail when a planned layout exceeds the limit.
+Tests: numbers for Qwen3-32B match `22` section 3 within 2%, LoRA formula example matches section 2, the GPU 3 layout passes and an over-committed layout fails.
+Done when:
+- [ ] `deckforge mem plan` prints the `22` section 4.1 table for the reference server.
+
+### T-14.2 Admission control and degradation ladder          Size: L
+Depends on: T-3.4, T-10.4
+Files: ~`deckforge/llm/pool.py`, +`deckforge/llm/admission.py`, tests
+Steps: `22` sections 6.2 to 6.4. Adaptive concurrency per replica (multiply the limit by 0.8 on waiting requests or KV above 95%, add 1 when KV is below 70% and nothing waits), priority queues, and the five-step degradation ladder of `22` section 6.4 applied in order after 60 s of saturation and undone in reverse.
+Tests: simulated replica metrics drive each ladder step and the undo, interactive calls are never starved by background calls.
+Done when:
+- [ ] Under a synthetic overload, vLLM never reports preemptions and the degradation gauge returns to 0 after the load drops.
+
+### T-14.3 Server benchmarks          Size: M
+Depends on: T-14.2, T-13.7
+Files: +`benchmarks/server/*.py`, ~`22` (replace estimates), ~`01` section 8
+Steps: `22` section 11 items 1 to 4 on the reference server.
+Done when:
+- [ ] Measured tables replace the estimates in `22` and `01`. FP8 KV within 0.5 QA points of bf16.
+
+### T-14.4 Laptop and companion-model benchmarks          Size: M
+Depends on: T-13.6, T-13.9
+Files: +`benchmarks/laptop/*.py`, ~`22` section 5
+Steps: `22` section 11 item 5, plus CLM ranking throughput and Laya-Vision images per second on the reference server.
+Done when:
+- [ ] Laptop tier table and GPU 3 throughput numbers in `22` are measured, not estimated.
+
+### T-14.5 GPU scheduler          Size: M
+Depends on: T-14.2
+Files: +`deckforge/ops/gpu_schedule.py`, CLI `deckforge gpu-schedule`, tests
+Steps: `22` section 4.2. Night window from config. Put `vllm-lm-b` to sleep (`POST /sleep?level=1`) or stop the container when dev mode is not allowed, start the training or teacher job on GPU 2, checkpoint and stop it when the run queue backs up or the window ends, then `POST /wake_up` and wait for `/is_sleeping` false before routing traffic back.
+Tests: state machine with fake endpoints, queue backlog interrupts training, wake failure falls back to container restart.
+Done when:
+- [ ] A night window on the reference server trains for 2 hours and serves again within 3 minutes of a simulated morning backlog.
+
+---
+
+## P15 Agents and protocol
+
+### T-15.1 Agent cards, registry and contracts          Size: M
+Depends on: T-4.10, T-5.4
+Files: +`deckforge/agents/{base.py,registry.py,contracts.py}`, +`deckforge/agents/<id>/card.yaml` for the 12 agents, tests
+Steps: `20` sections 2, 3 and 5. `AgentCard` model and startup validation (tools exist, decisions exist, prompts exist, models import). Contracts with `schema_version`.
+Tests: every card loads and validates, a card with an unknown tool fails startup, unknown major schema version is rejected.
+Done when:
+- [ ] `deckforge agents list` prints the roster with adapters, tools and limits.
+
+### T-15.2 DAP envelope, blackboard and ownership          Size: L
+Depends on: T-15.1
+Files: +`deckforge/agents/protocol.py`, +`deckforge/agents/blackboard.py`, +`migrations/versions/*_agent_messages.py`, tests (`27` section 12 list)
+Steps: `27` sections 2 to 4 and 10. Envelope and performatives, message contracts, artefact references with versions, blackboard reads and writes with owner enforcement, the permission matrix, `app.agent_messages` writes through the telemetry writer.
+Tests: `tests/unit/agents/test_protocol.py` per `27` section 12.
+Done when:
+- [ ] A write by a non-owner is refused and logged, every message of a golden run is stored with its conversation id.
+
+### T-15.3 Dependency graph and redo          Size: M
+Depends on: T-15.2
+Files: +`deckforge/agents/dependencies.py`, tests
+Steps: `27` section 5 and 6.3. Artefact dependency DAG, invalidation on a new version, `TASK(kind="redo")` fan-out to dependants in order, skip when the dependant's inputs hash is unchanged.
+Tests: `tests/unit/agents/test_dependencies.py`.
+Done when:
+- [ ] Changing the exhibit of one slide redoes only that slide's copy and asset checks.
+
+### T-15.4 Workflow agents over the existing nodes          Size: L
+Depends on: T-15.2, T-6.7
+Files: +`deckforge/agents/<id>/{graph.py,steps.py}` for the workflow agents, ~`deckforge/graphs/deck.py`, tests
+Steps: `20` section 4 workflow pattern. Wrap intake, planning, data binding, composer steps (viz, copy, assets), fact checking and review as agent subgraphs that take `TaskOrder` and return `TaskResult`. Replace direct owner calls in `qa_router` with agent tasks. Outputs and events must stay identical to P6 on the golden briefs.
+Tests: golden-brief graph tests unchanged and green, each agent has a unit test with FakeLLM.
+Done when:
+- [ ] P4 and P6 demos pass through agents with identical artefacts on fixtures.
+
+### T-15.5 ReAct factory, supervisor and revision graph          Size: L
+Depends on: T-15.4
+Files: ~`deckforge/agents/factory.py`, +`deckforge/agents/supervisor/*`, +`deckforge/graphs/revision.py`, job `run.revise`, tests
+Steps: `20` section 4 ReAct pattern and W2, `27` section 6.4. Supervisor returns a `RevisionPlan` through `D_REVISION_ROUTE` and `D_REVISION_SCOPE` with LLM fallback, the orchestrator validates and dispatches, dependants are redone, incremental QA runs.
+Tests: scripted revision requests map to the right owner and scope with FakeLaya, invalid plans are rejected, the supervisor never writes an artefact.
+Done when:
+- [ ] "Show this as a map" on a fixture slide produces a new exhibit, updated copy and a new deck version.
+
+### T-15.6 NEED routing, arbitration and loop control          Size: L
+Depends on: T-15.4
+Files: ~`deckforge/graphs/nodes/qa_router.py`, +`deckforge/agents/arbitration.py`, +`deckforge/agents/needs.py`, tests
+Steps: `27` sections 6.2, 6.6 and 8.4. `NEED` routing with `D_NEED_ROUTE` fallback, limits on needs per task, placeholders for non-blocking needs. Arbitration order for `REJECT(constraint_conflict)`. Loop control table: re-task, reroute, regression revert, residual acceptance with `D_REPAIR_STOP`.
+Tests: `tests/unit/graphs/test_need_flow.py`, `test_qa_router.py`, arbitration cases from `27` section 6.6.
+Done when:
+- [ ] The worked example in `27` section 8.5 runs as an integration test.
+
+### T-15.7 Escalation, cancellation and progress          Size: M
+Depends on: T-15.4
+Files: ~`deckforge/graphs/deck.py`, +`deckforge/agents/control.py`, tests
+Steps: `27` sections 6.7 to 6.9. `ESCALATE` to LangGraph `interrupt` with batching of non-blocking questions, `CANCEL` checked between model and tool calls, `INFO` mapped to `node.progress` events.
+Tests: blocking escalation pauses and resumes with the answer in `reads`, cancel stops a running agent within one step.
+Done when:
+- [ ] A blocking question from data_analyst reaches the UI and the run resumes after the answer.
+
+### T-15.8 Cross-worker transport          Size: M
+Depends on: T-15.2, T-2.2
+Files: +`deckforge/agents/transport_jobs.py`, tests
+Steps: `27` section 9 level L-B. Envelope in a `jobs` row with kind `agent.task` and a worker-kind filter, reply into `agent_messages` and pub/sub, deadline handling counts a failed attempt, idempotency key reuse on retries.
+Tests: reply delivered across two worker processes, deadline expiry, duplicate delivery ignored.
+Done when:
+- [ ] Researcher runs on a separate network-enabled worker in the compose stack.
+
+### T-15.9 A2A v1 bridge          Size: M
+Depends on: T-15.2, T-2.4
+Files: +`deckforge/api/routers/a2a.py`, +`deckforge/agents/a2a_bridge.py`, tests
+Steps: `27` section 9, level L-C and the A2A mapping. Publish `/.well-known/agent-card.json` for the orchestrator only (skills `generate_deck`, `revise_deck`, `review_deck`), map A2A tasks to runs and revisions, stream status updates from run events, authenticate with API keys and scopes. Internal agents are never exposed.
+Tests: `tests/integration/test_a2a_bridge.py` (Agent Card, SendMessage round trip, state mapping), scope checks.
+Done when:
+- [ ] An external A2A client creates a deck and receives the artefact link.
+
+### T-15.10 Agent eval suites and observability          Size: M
+Depends on: T-15.4, T-10.4
+Files: +`evals/agents/<id>/*`, +`deckforge/evals/agents.py`, Grafana agents dashboard
+Steps: `20` sections 11 and 12. Suite per agent with the sizes and bars in the table, metrics and dashboard from `16` section 4 item 6.
+Done when:
+- [ ] Nightly agent suite report produced, dashboard shows tasks, rejects and repair outcomes per agent.
+
+### T-15.11 Per-agent adapters and weekly refinement report          Size: M
+Depends on: T-15.10, T-13.5
+Files: +`training/agents/train_adapter.py`, +`training/agents/report.py`, job `train.agent_report`
+Steps: `19` section 5.5 and `20` section 10.2. Train an r16 adapter only for agents below their card targets after the multitask model, gate on the agent suite plus no regression elsewhere. Weekly report per agent: failure clusters, traces, suggested data.
+Done when:
+- [ ] At least one adapter trained, gated and served through `agent_adapters`, with the report committed.
+
+---
+
+## P16 Visual inspector
+
+### T-16.1 L2 rendered geometry checks          Size: M
+Depends on: T-6.3
+Files: +`deckforge/inspect/geometry.py`, tests
+Steps: `25` section 2. Extract words, lines and images with boxes from the rendered PDF, compare with the object model, emit the defect codes in the table with bounding boxes.
+Tests: fixture decks with planted overflow, overlap, off-safe-area and font substitution are each detected with the right box.
+Done when:
+- [ ] Inspector findings carry slide, box and standard id, and appear in the QA report.
+
+### T-16.2 L3 pixel checks          Size: M
+Depends on: T-16.1
+Files: +`deckforge/inspect/pixels.py`, tests
+Steps: `25` section 3 with numpy and Pillow on the 144 dpi snapshot: rendered contrast, palette adherence, visual density, balance, collisions as drawn, near-duplicate slides.
+Tests: planted low contrast text over an image is caught, an off-palette colour is caught, two near-identical slides are flagged.
+Done when:
+- [ ] Pixel checks run on a 15-slide deck in under 2 s on CPU.
+
+### T-16.3 Laya-Vision service and df-laya-vision          Size: L
+Depends on: T-16.1, T-5.6
+Files: +`deploy/docker/Dockerfile.laya_vision`, +`deckforge/decisions/visual.py` (`VisualJudge`), +`training/laya_vision/*`, tests
+Steps: `25` sections 4 and 8, `09` section 10.3. Vendor the fork code at a pinned commit with NOTICE, never download the upstream weights. Train `df-laya-vision` on Apache-licensed backbones with perturbation labels, calibrate, serve on port 8210, batch per deck.
+Tests: `VisualJudge` contract tests with recorded fixtures, licence check script fails if an upstream checkpoint hash is present in `/models`.
+Done when:
+- [ ] `V_FOCAL` and `V_TEXT_ON_IMAGE` pass the judge gates in `09` section 9.2 and run in shadow.
+
+### T-16.4 L5 rubric review with regions          Size: M
+Depends on: T-6.4, T-13.10
+Files: ~`deckforge/evaluators/tier3.py`, +`prompts/judge/visual_regions.md`, tests
+Steps: `25` section 5. `df-vlm` returns rubric scores plus regions as normalised boxes, snapped to the nearest shape from the object model so findings point at an element and its owner.
+Tests: box snapping, invalid boxes discarded, mapping to owners.
+Done when:
+- [ ] Every L5 finding names a shape id and an owner.
+
+### T-16.5 L6 clicks: object model and UNO session          Size: M
+Depends on: T-16.1
+Files: +`deckforge/inspect/clicks.py`, +`deckforge/inspect/uno_session.py`, tests
+Steps: `25` sections 6a and 6b. Object-model clicks (embedded chart workbooks, exhibit alt text JSON, real text frames, z-order reading order, section tracker, agenda, links, notes, hidden content, template layouts), then a LibreOffice UNO session on the renderer that opens the deck and verifies the same properties after a real load.
+Tests: planted broken link, wrong tracker, workbook and chart value mismatch and wrong reading order detected, UNO check in the golden CI container.
+Done when:
+- [ ] Click checks run on every deck in under 3 s for 15 slides.
+
+### T-16.6 PowerPoint fidelity runner (optional)          Size: M
+Depends on: T-16.5
+Files: +`tools/ppt_fidelity/runner.py` (Windows host), +`docs/ops/ppt_fidelity.md`
+Steps: `25` section 6c. COM automation opens each golden deck in PowerPoint, exports PNGs, compares with LibreOffice renders, reports differences above a pixel threshold. Runs nightly on a Windows host, never in customer installs by default.
+Done when:
+- [ ] Nightly fidelity report for golden decks, with the diff images.
+
+### T-16.7 L7 flow checks and L8 UI journeys          Size: M
+Depends on: T-16.2, T-9.8
+Files: +`deckforge/inspect/flow.py`, +`tests/e2e/journeys/*.spec.ts`, axe checks
+Steps: `25` sections 7 and 9. Deck-level flow (storyboard review on a contact sheet, sequence rules, narrative flow judges, click-through continuity, exec summary coverage), and Playwright journeys for the stories in `26` with axe accessibility checks.
+Tests: three identical layouts in a row and an exec summary number that differs from the body are detected, journeys green.
+Done when:
+- [ ] P16 exit demo passes, and every `26` story with a journey id has a passing test.
+
+---
+
+## P17 Knowledge base
+
+### T-17.1 Card schema, validator and import          Size: L
+Depends on: T-4.5
+Files: +`deckforge/knowledge/schema.py`, +`deckforge/knowledge/validate.py`, +`knowledge/**` (cards), +`training/kb/import_*.py`, CLI `deckforge kb validate`, tests
+Steps: `28` sections 2 to 4. Card models, validator (ids, links, detectors, strategies and owners exist), importers from `docs/FRAMEWORK_LIBRARY.md`, the TRD chart and QA rules, existing look-and-feel and consistency code, and the exhibit registry.
+Tests: every imported card validates, a broken link or unknown detector fails validation.
+Done when:
+- [ ] About 800 global cards validate, with counts per type in the PR.
+
+### T-17.2 KB build, release and kb_version          Size: M
+Depends on: T-17.1
+Files: +`deckforge/knowledge/build.py`, +`migrations/versions/*_runs_kb_version.py`, +`knowledge/RELEASES.md`, CLI `deckforge kb build --release`
+Steps: `28` section 5. Compile cards into `kb_items` per namespace with embeddings, upload CLM candidate embeddings for rankable namespaces, write `kb_version`. Migration adds `runs.kb_version` and `runs.model_versions`. Every run stores both.
+Tests: build is reproducible (same inputs give the same version hash), lite and server stores agree on search results for fixtures.
+Done when:
+- [ ] Runs show `kb_version` in the plan report.
+
+### T-17.3 Retrieval modes and per-agent context packs          Size: M
+Depends on: T-17.2, T-15.1
+Files: +`deckforge/knowledge/kb.py` (`KnowledgeBase`), +`deckforge/tools/impl/knowledge.py` (`kb_search`, `kb_get`), ~`deckforge/context/builder.py`, tests
+Steps: `28` section 6. By id, shortlist, rank (CLM), typed pick (Laya), context injection into prompt sections 2 and 3, tools for ReAct agents. Every output records `kb_refs`.
+Tests: per-agent packs match the table in `28` section 6.2, digests stay within token budgets, `kb_refs` written.
+Done when:
+- [ ] Plan report cites card ids for frameworks, exhibits and standards.
+
+### T-17.4 Design standards as the QA registry          Size: M
+Depends on: T-17.1, T-6.1
+Files: ~`deckforge/evaluators/*`, +`deckforge/knowledge/standards.py`, tests
+Steps: `28` section 7 and `27` section 8.1. DS cards define severity, detectors, owner, strategies and acceptance. The cascade and `qa_router` read them instead of hard-coded maps. A sync test fails when a detector exists in code without a card or a card names a missing detector.
+Tests: sync test, severity change in a card changes routing without code changes.
+Done when:
+- [ ] Every finding in the QA report carries a standard id.
+
+### T-17.5 KB evals and maintenance loop          Size: M
+Depends on: T-17.3
+Files: +`evals/kb/*`, +`deckforge/evals/kb.py`, job `kb.maintenance`
+Steps: `28` sections 8 and 9. Retrieval eval (recall at 5 per namespace), usefulness from accepted outputs that cite a card, stale and unused card report, teacher-drafted card proposals queued for review.
+Done when:
+- [ ] Monthly maintenance report generated and the retrieval eval meets its bar.
+
+### T-17.6 Org knowledge cards          Size: M
+Depends on: T-17.3, T-9.7
+Files: +`deckforge/api/routers/knowledge.py`, `frontend/src/features/admin/knowledge/*`, tests
+Steps: `28` section 10 and `26` US-11.5. Org cards (terminology, banned phrases, house frameworks, exemplars) with YAML import and export, validated with the same validator, scoped by `org_id`.
+Tests: org isolation, validation errors surfaced in the UI.
+Done when:
+- [ ] An org admin adds a banned phrase and the next run's copy avoids it.
+
+---
+
+## P18 Product stories and data
+
+### T-18.1 Later-phase tables          Size: M
+Depends on: T-1.2
+Files: +`migrations/versions/*_revisions_comments_variants_shares_usage.py`, ~`deckforge/db/models.py`, repositories, tests
+Steps: tables `revisions`, `comments`, `slide_variants`, `shares`, `usage_daily` exactly as `23` section 3, with the indexes from `23` section 2.
+Tests: migration up and down on PostgreSQL and SQLite, repository org filters.
+Done when:
+- [ ] `alembic upgrade head` and `downgrade -1` succeed in both modes.
+
+### T-18.2 Revisions, variants, diff and restore APIs          Size: L
+Depends on: T-18.1, T-15.5
+Files: +`deckforge/api/routers/{revisions.py,variants.py}`, ~`runs.py`, tests
+Steps: endpoints from `26` section 8 for US-6.2 to US-6.6 and US-7.1, US-7.2. Diff compares slide specs and renders per-slide change flags.
+Tests: API tests per story acceptance criteria.
+Done when:
+- [ ] A revision, a variant choice and a restore each create the expected deck version.
+
+### T-18.3 Review links, comments and approval          Size: L
+Depends on: T-18.1
+Files: +`deckforge/api/routers/{shares.py,comments.py}`, ~`deckforge/security/*`, tests
+Steps: `26` US-10.1 to US-10.4. Signed expiring share links with view or comment rights, comments anchored to slide and shape, comment to revision, approval with audit entries.
+Tests: link expiry, rights enforcement, anchor survives a new version when the shape still exists.
+Done when:
+- [ ] P18 exit demo passes end to end.
+
+### T-18.4 Deck studio UI: revise, variants, diff, comments          Size: L
+Depends on: T-18.2, T-18.3, T-9.5
+Files: `frontend/src/features/studio/*`
+Steps: `26` sections 5.3 and 6 (selection, revision panel, variant picker, diff view, comment threads, approve).
+Done when:
+- [ ] The `26` E6 and E10 journeys pass in Playwright.
+
+### T-18.5 Brief quality meter and onboarding          Size: M
+Depends on: T-9.3, T-5.5
+Files: ~`frontend/src/features/briefs/*`, +`POST /briefs/{id}/check`
+Steps: `26` US-3.1 and E1. Synchronous Laya `D_BRIEF_GAPS` check shows which inputs are missing before a run starts. First-run onboarding with the example project.
+Done when:
+- [ ] Meter updates within 300 ms while typing (debounced) on the reference server.
+
+### T-18.6 Notifications and exports          Size: M
+Depends on: T-18.1, T-10.8
+Files: +`deckforge/notify/*`, +`deckforge/api/routers/exports.py`, `frontend/src/features/notifications/*`
+Steps: `26` E8 and E13. Exports (pptx, pdf, png zip, xlsx of exhibit data) as jobs, in-app and email notifications with per-user preferences.
+Done when:
+- [ ] A finished run notifies its creator and the export bundle downloads.
+
+### T-18.7 Product metrics          Size: S
+Depends on: T-18.1
+Files: +`deckforge/accounting/product_metrics.py`, admin usage page
+Steps: `26` section 9 metrics computed install-locally from `usage_daily` and run tables. Nothing leaves the install.
+Done when:
+- [ ] Admin page shows the metrics for the last 30 days.
+
+---
+
 ## 3. Release checklist (v1.0)
 
-- [ ] All tickets P0 to P10 merged. P11 at least T-11.1 to T-11.5 with one promotion. P12 T-12.1 to T-12.4.
+- [ ] All tickets P0 to P10 merged. P11 at least T-11.1 to T-11.5 with one promotion. P12 T-12.1 to T-12.4, T-12.10 and T-12.11.
+- [ ] P13: `df-lm-v1` (32B and one smaller size) promoted on the gates in `19` section 6, with exports for every supported tier. No closed-model API in code or training data (CI grep and data register check).
+- [ ] P14: memory plan and benchmarks measured on the reference server and the three laptop tiers. No OOM and no vLLM preemption in the load test.
+- [ ] P15: all workflows run through agents and the DAP, the `27` section 8.5 worked example passes, agent suites meet their bars.
+- [ ] P16: inspector L1 to L7 on by default, L4 judges promoted or in shadow with recorded metrics. The upstream Laya-Vision checkpoint is absent (licence check script).
+- [ ] P17: KB release recorded on every run, design standards drive QA, retrieval eval passes.
+- [ ] P18: stories with journey ids pass in Playwright.
 - [ ] Eval suite `briefs` meets its pass bar on the reference node with on-prem models.
 - [ ] Founder blind review: 20 slide pairs vs the previous release, preferred or tied in at least 60%, and the three sample-deck quality bars (Accenture, Bain, BCG, McKinsey style) reviewed on five briefs.
 - [ ] Security suite green, Trivy and audits without critical findings, SBOM published.

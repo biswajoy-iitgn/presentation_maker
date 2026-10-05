@@ -52,12 +52,12 @@ All paths are under `/api/v1`. "Async" means the response returns immediately an
 
 | Method | Path | Notes |
 |---|---|---|
-| GET, PATCH | `/org` | settings: `allow_cloud_llm`, `default_family`, `research_enabled`, `retention_days`, `model_profile` |
+| GET, PATCH | `/org` | settings: `default_family`, `research_enabled`, `retention_days`, `model_profile`, `allow_training` (local head and adapter jobs on this install, `19`), `allow_exploration` (counterfactual exploration on internal eval runs only, `24`), `fix_minor` |
 | GET, POST | `/org/members` | invite by email (creates user with a set-password link in server mode) |
 | PATCH, DELETE | `/org/members/{user_id}` | change role, remove |
 | GET, POST | `/org/api-keys` | POST returns the full key once |
 | DELETE | `/org/api-keys/{id}` | revoke |
-| GET, POST, DELETE | `/org/credentials` | provider credentials, value never returned |
+| GET, POST, DELETE | `/org/credentials` | search and connector credentials, value never returned |
 | GET | `/org/usage?from&to` | aggregated `usage_ledger` |
 | GET | `/org/audit?cursor` | audit log |
 
@@ -177,7 +177,7 @@ Event payload `data` by type:
 |---|---|
 | 400 | `VALIDATION_FAILED` (with `errors: [{loc, msg}]`), `UNSUPPORTED_FILE`, `FILE_TOO_LARGE` |
 | 401 | `UNAUTHENTICATED`, `TOKEN_EXPIRED` |
-| 403 | `FORBIDDEN`, `SCOPE_MISSING`, `CLOUD_LLM_DISABLED` |
+| 403 | `FORBIDDEN`, `SCOPE_MISSING`, `TRAINING_DISABLED` |
 | 404 | `NOT_FOUND` (also for rows of other orgs, never 403, to avoid leaking existence) |
 | 409 | `CONFLICT`, `RUN_NOT_WAITING`, `RESUME_KIND_MISMATCH`, `IDEMPOTENCY_REPLAY` (returns the original run) |
 | 413 | `FILE_TOO_LARGE` (nginx may answer first) |
@@ -218,7 +218,7 @@ Token bucket algorithm in Valkey: one Lua script `deckforge/api/ratelimit.lua` (
 
 - Every billable event writes `usage_ledger` (runs started, LLM tokens per call, renders, storage delta).
 - Quota check at run creation and before each LLM call batch (cheap aggregate cached in Valkey for 60 s).
-- LiteLLM virtual keys per org add a second budget guard at the gateway (server mode).
+- The `ModelPool` token budget semaphore (`22`, section 6) is the second guard: a run that exceeds `max_tokens_total` gets `budget_exhausted` and the run ends gracefully with what it has.
 
 ### 6.3 Idempotency
 
@@ -263,3 +263,5 @@ deckforge/api/
 ```
 
 Every router function: validates input with a schema, loads rows through a repository that filters by `principal.org_id`, performs one unit of work in a transaction, enqueues jobs after commit (outbox pattern: the job row is inserted in the same transaction, so a crash cannot lose it).
+
+Endpoints added by the user stories (revisions, slide copy edits, variants, diffs, restore, exports, shares, comments, approval, org knowledge, notifications, A2A) are listed in `26`, section 8, with the story each one serves. They live in routers `revisions.py`, `variants.py`, `comments.py`, `shares.py`, `exports.py`, `knowledge.py` and `a2a.py`, and follow the same rules as above.

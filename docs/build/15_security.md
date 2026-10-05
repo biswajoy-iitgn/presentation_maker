@@ -24,7 +24,7 @@ Baseline: OWASP ASVS level 2 for the web app, OWASP Top 10 for LLM applications 
 ## 3. Transport
 
 - TLS 1.2+ at nginx with HSTS. Internal service traffic on a private Docker network. Optional mTLS between hosts in multi-host installs (customer PKI).
-- Laya, renderer, LiteLLM, vLLM, SearXNG, PostgreSQL and Valkey never publish ports outside the internal network. Laya and LiteLLM additionally require bearer keys.
+- Laya, Laya-Vision, CLM, renderer, vLLM replicas, SearXNG, PostgreSQL and Valkey never publish ports outside the internal network. Laya, Laya-Vision, CLM and vLLM (`--api-key` from the `pool_key` secret) additionally require bearer keys. vLLM replicas with `VLLM_SERVER_DEV_MODE=1` (sleep endpoints) are reachable only from the worker network.
 
 ## 4. Uploads
 
@@ -69,7 +69,7 @@ Baseline: OWASP ASVS level 2 for the web app, OWASP Top 10 for LLM applications 
 - Encryption at rest: customer-managed disk encryption (LUKS, BitLocker, cloud volume encryption). S3 server-side encryption when S3 is used.
 - Retention and purge jobs (`04`, section 5). Purge is verifiable (row counts and blob listing in the audit entry).
 - PII: optional Presidio-based redaction of names and emails in `decision_log.state_text` and `llm_calls` previews (P12, org setting).
-- Data processing record: the admin UI shows which external services an org's data can reach (cloud LLM, search, stock images) given current settings.
+- Data processing record: the admin UI shows which external services an org's data can reach (web search, stock images, connectors) given current settings. Model inference never leaves the install (D16). With `allow_training` on, the record also lists which local training jobs may read the org's traces, and that nothing leaves the install.
 
 ## 8. Application hardening
 

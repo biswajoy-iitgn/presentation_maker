@@ -2,8 +2,8 @@
 
 | Field | Value |
 |---|---|
-| Status | V3 draft, 2026-10-04. Supersedes `docs/BUILD_PLAN.md` (V2) for everything after the M1 renderer |
-| Product scope | `docs/PRD_V2.md` (decisions D1 to D15) |
+| Status | V3 draft, 2026-10-04, extended 2026-10-05 with documents 19 to 28 (open model training, agents, protocol, knowledge base, inspector, UI). Supersedes `docs/BUILD_PLAN.md` (V2) for everything after the M1 renderer |
+| Product scope | `docs/PRD_V2.md` (decisions D1 to D15), plus D16 to D18 in `19` (open-weight onboard model, open teachers, no closed-API outputs) |
 | Design depth | `docs/TRD_V2.md` (slide grammar, chart tiers, QA-1 to QA-11, data engine) |
 | Audience | A coding agent (a small model such as Claude Haiku 4.5 is the target reader) or an engineer implementing tickets in order |
 | Goal | A commercial, on-prem-first presentation maker that runs on macOS, Windows and Linux for one user, and as a multi-tenant server behind nginx for many concurrent users |
@@ -56,18 +56,28 @@ Read in this order the first time:
 | `04_domain_and_data_model.md` | Pydantic domain contracts, PostgreSQL DDL, blob layout, retention |
 | `05_api.md` | REST API, auth, SSE events, errors, rate limits, quotas, webhooks, API keys |
 | `06_orchestration_langgraph.md` | LangGraph graphs, state schema, nodes, edges, interrupts, checkpointing, streaming, worker loop |
-| `07_llm_layer.md` | Model roles, providers, gateway, structured output, prompts, retries, cost accounting |
+| `07_llm_layer.md` | Model roles and adapters, local backends (vLLM pool, Ollama, llama.cpp), structured output, prompts, retries, internal cost accounting |
 | `08_tools.md` | Tool contract, registry, executor, Laya-based tool selection, MCP |
-| `09_laya_decisions_and_evaluators.md` | Laya deployment, decision catalogue, question schemas, calibration, evaluator cascade, fine-tuning pipeline |
+| `09_laya_decisions_and_evaluators.md` | Laya deployment, decision catalogue, question schemas, calibration, evaluator cascade, repair strategies with owners, fine-tuning pipeline, CLM rankers and Laya-Vision |
 | `10_context_and_memory.md` | Context builder, token budgets, compaction, retrieval, long-term memory, untrusted content |
-| `11_caching.md` | Ten cache layers, keys, TTLs, invalidation, tenancy isolation |
+| `11_caching.md` | Thirteen cache layers (including prefix, CLM, KB and LoRA caches), keys, TTLs, invalidation, tenancy isolation |
 | `12_render_engine_and_assets.md` | PPTX compiler, template ingestion, preview renderer, fonts across OS, asset pipeline |
 | `13_frontend.md` | Web app pages, components, state, SSE client |
 | `14_deployment_nginx_scaling.md` | Lite install on three OSes, Docker Compose, nginx config, scaling, air-gapped install, backups |
 | `15_security.md` | AuthN/Z, tenancy, upload safety, SSRF, prompt injection, secrets, compliance checklist |
 | `16_observability.md` | Logs, traces, metrics, dashboards, alerts |
 | `17_testing_ci_evals.md` | Test pyramid, fakes, CI matrix, golden decks, eval harness, load tests |
-| `18_work_breakdown.md` | Phases P0 to P12 and every ticket with files, steps, tests and done criteria |
+| `18_work_breakdown.md` | Phases P0 to P18 and every ticket with files, steps, tests and done criteria |
+| `19_deckforge_lm_training.md` | DeckForge-LM: base model choice, data engine, SFT, DPO, GRPO, distillation, agent adapters, export, gates, risks |
+| `20_agents_and_workflows.md` | The 12 agent roles, agent cards, factory, contracts, workflows W1 to W7, agent memory, traces, training and evaluation per agent |
+| `21_tools_lifecycle.md` | How tools are designed, built, exposed, sandboxed, trained around, measured and refined |
+| `22_memory_and_performance.md` | GPU and RAM budgets with formulas, server and laptop tiers, ModelPool admission control, degradation ladder, speed levers |
+| `23_database_latency_optimisation.md` | Entity map, access patterns and indexes, later tables, partitioning, read and write paths, latency budgets |
+| `24_training_strategy.md` | What is trained (orchestrator decisions, agents, verifiers), on what data, with which metrics and gates, cycle schedule |
+| `25_visual_qa_inspector.md` | Visual QA layers L1 to L8: geometry, pixels, vision judges, rubric review, object-model clicks, flows, UI checks |
+| `26_product_ui_user_stories.md` | Personas, journeys, user stories with acceptance criteria, screens, interaction details, API additions |
+| `27_agent_communication.md` | DeckForge Agent Protocol: envelope, performatives, contracts, ownership, dependency graph, routing of findings, transports, A2A mapping |
+| `28_knowledge_base.md` | Knowledge base cards (frameworks, analysis recipes, dataviz, exhibits, design standards, storyline, archetypes, industries, exemplars), build pipeline, how agents use them |
 
 ---
 
@@ -85,12 +95,26 @@ Read in this order the first time:
 | Design system | Colours, fonts, grid, layouts and logo rules, from a style family or extracted from a customer template |
 | Style family | A built-in design system (MERIDIAN, VERDANT and later others) |
 | Decision | A fast typed judgement made by Laya (a choice, a score or a probability) with a calibrated confidence |
-| Judge | An evaluator question about quality (for example "is this an action title"). Tier 1 judges run on Laya, Tier 2 on an LLM, Tier 3 on a vision LLM |
-| Defect | A QA finding with a code, a severity, evidence and a suggested repair |
+| Judge | An evaluator question about quality (for example "is this an action title"). Tier 1 judges run on Laya (text) or Laya-Vision (slide images), Tier 2 on DeckForge-LM, Tier 3 on `df-vlm` |
+| Defect, finding | A QA finding with a code, a design standard id, a severity, evidence, an owner and a suggested repair strategy (`27`, section 8.2) |
 | Lite mode | Single-user install on a laptop: SQLite, local files, in-process worker, no Docker |
 | Server mode | Multi-tenant install: PostgreSQL, Valkey, object storage, nginx, separate workers, renderer and model services |
-| Role (LLM) | A named purpose such as `planner`, `writer`, `judge`, mapped in config to a provider and model |
+| Role (LLM) | A named purpose such as `planner`, `writer`, `judge`, mapped in config to a model pool, a base model and an optional adapter |
 | Org | A tenant (customer company). All data rows carry `org_id` |
+| DeckForge-LM (`df-lm`) | Our fine-tuned open-weight LLM (Qwen3 dense family, 32B, 14B and 8B) that every agent runs on (`19`) |
+| Adapter | A LoRA adapter for one agent role (for example `df-writer`), served by vLLM multi-LoRA on top of `df-lm` |
+| ModelPool | Our in-process router over vLLM replicas: adapter and prefix affinity, token budget semaphore, priorities, degradation ladder (`22`, section 6) |
+| CLM | Contrastive LM ranker (CLM-8B heads over a frozen Qwen3-8B encoder) for large candidate sets and best-of-N verification (`09`, section 10) |
+| Laya-Vision | Typed visual judge on rendered slide images. Code from the fork, weights trained by us (`25`, section 4) |
+| Agent | A role on the consulting team with a typed input, output, tools, adapter and limits (`20`) |
+| Orchestrator | The deck graph plus `qa_router` and the dependency graph. Sends every task, owns no artefact (`27`) |
+| DAP | DeckForge Agent Protocol: typed envelopes with performatives `TASK`, `ACK`, `RESULT`, `REJECT`, `NEED`, `REPORT`, `ESCALATE`, `CANCEL`, `INFO` (`27`) |
+| Artefact owner | The single agent allowed to write an artefact (copy, exhibit decision, asset plan, layout patch and so on). QA findings go to it (`27`, section 4) |
+| KB card | A versioned YAML card in the knowledge base (framework, recipe, dataviz rule, exhibit, design standard, storyline pattern and so on) (`28`) |
+| `kb_version` | The compiled knowledge base release stored on every run |
+| Design standard | A DS card that is at the same time a QA check definition: detectors, severity, owner, strategies, acceptance (`28`, `27` section 8.1) |
+| Inspector | The visual QA stack L1 to L8 that renders, measures, clicks and judges slides (`25`) |
+| Counterfactual replay | Forking a run from a LangGraph checkpoint to try each option of a decision and label the best one (`24`, section 3.2) |
 
 ---
 
@@ -104,8 +128,8 @@ These are decisions taken so that work can proceed. The founder can override any
 | A2 | Two deployment modes from one codebase: lite (SQLite, files, in-process worker) and server (PostgreSQL, Valkey, object storage, workers, nginx) | One user on a laptop and hundreds of users on a server need different infrastructure, but the same domain code | `01`, `14` |
 | A3 | LangGraph 1.2 for orchestration, LangChain 1.4 for model, prompt and tool interfaces. No LangChain legacy agents | Durable checkpoints, human-in-the-loop interrupts, parallel fan-out and streaming are built in | `06` |
 | A4 | Laya is the fast "System 1" decision layer for routing, tool selection, guardrails and Tier 1 judges. The LLM is "System 2" and the fallback whenever Laya abstains | Laya answers typed questions in one forward pass (tens of ms) with calibrated confidence. Its base checkpoints are near chance on complex typed decisions until fine-tuned, so it starts in shadow mode and earns each decision with measured accuracy | `08`, `09` |
-| A5 | On-prem open-weight models are the reference: vLLM on Linux GPU servers, Ollama on laptops. Cloud providers (Anthropic first) are optional per org and off by default | D2: customer data stays in the customer environment | `07` |
-| A6 | Anthropic models are called through the official SDK (via `langchain-anthropic`), never through an OpenAI-compatible shim. All roles default to `claude-opus-5-5` with `effort` tuned per role. Cheaper models are a founder decision after evals | Correct feature support (structured outputs, prompt caching, refusal handling) | `07` |
+| A5 | All inference is local and open-weight (D16): DeckForge-LM on vLLM with multi-LoRA on Linux GPU servers, on Ollama or llama.cpp on laptops. No closed-model API at runtime, no closed-API outputs in training data | D2: customer data stays in the customer environment. Closed-API terms forbid training competing models on outputs | `07`, `19` |
+| A6 | `ModelPool` (our code) routes calls to vLLM replicas. No LiteLLM or other gateway | Needs adapter and prefix affinity, a cluster-wide token budget and priority classes, which a generic gateway does not give | `07`, `22` |
 | A7 | Valkey (BSD) instead of Redis 8 (AGPL, RSAL or SSPL) for cache, rate limits and pub/sub | Redistribution to customers without copyleft exposure. The `redis` Python client works with Valkey | `02` |
 | A8 | Blob storage behind an interface: local filesystem by default, any S3-compatible store optionally (SeaweedFS in the reference multi-node stack) | MinIO's licence and distribution changes make it a poor default to ship | `02`, `12` |
 | A9 | Job queue built on PostgreSQL (`FOR UPDATE SKIP LOCKED` with leases), not Celery | Cross-platform, no extra broker, survives worker crashes, and LangGraph checkpoints make re-leased jobs resume where they stopped | `06` |
@@ -116,6 +140,13 @@ These are decisions taken so that work can proceed. The founder can override any
 | A14 | Observability: structured JSON logs, OpenTelemetry traces, Prometheus metrics, plus a `llm_calls` table in PostgreSQL. Langfuse is an optional add-on | Works offline, no SaaS dependency | `16` |
 | A15 | Auth: local accounts (argon2) plus optional OIDC SSO, short-lived JWT access tokens, rotating refresh cookies, hashed API keys | Fits small installs and enterprise SSO | `05`, `15` |
 | A16 | Package and service names keep the existing `deckforge` Python package. New subpackages are added beside the existing ones | No churn in working code | `03` |
+| A17 | Base model family: Qwen3 dense (Apache-2.0), 32B for servers, 14B and 8B distilled for smaller servers and laptops. Final pick after the bake-off ticket T-13.1 | Permissive licence, one tokenizer across sizes, strong tool calling and thinking toggle | `19` |
+| A18 | CLM-8B (Apache-2.0) for ranking and best-of-N verification, served as `clm-serve` over a frozen base Qwen3-8B pooling encoder | Ranking cost barely grows with candidate count, cheap head training | `09`, `24` |
+| A19 | Laya-Vision fork code is used, its published weights are not (CC BY-NC-SA). We train `df-laya-vision` on Apache-licensed backbones | Commercial redistribution | `25` |
+| A20 | Agents communicate only through the orchestrator (hub and spoke) with the typed DAP. No agent calls another agent as a tool. An A2A v1 bridge exposes the orchestrator to external agents | Ownership, budgets and traces stay attributable, which training needs | `27` |
+| A21 | Domain knowledge lives in versioned KB cards. Design standards double as the QA standards registry | One source of truth for what agents do and what QA checks | `28` |
+| A22 | Telemetry streams are partitioned by month with a buffered `COPY` writer. Run state is never buffered | Write throughput and cheap retention | `23` |
+| A23 | Visual QA renders every slide and checks geometry, pixels and vision judges. "Clicks" are object-model interactions plus LibreOffice UNO inspection. A PowerPoint fidelity runner on Windows is optional | Deterministic, runs on every deck. GUI agents stay a nightly research track | `25` |
 
 ---
 

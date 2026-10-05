@@ -29,7 +29,7 @@
 |---|---|
 | `core` | Model validation edge cases, JSON round trips, discriminated union of exhibit data |
 | `ingest` | Profiling of the example xlsx, semantic type rules, template theme extraction on two fixture templates (one corporate-like, one minimal), malformed inputs |
-| `llm` | Structured output repair path, provider-specific parameter rules (Anthropic: no temperature, json_schema method, effort mapping), usage recording, cache key stability, error mapping |
+| `llm` | Structured output repair path, backend rules (vLLM: `extra_body` with `chat_template_kwargs.enable_thinking`, adapter name as model, hermes tool parser. Ollama and llama.cpp: JSON schema format), `ModelPool` routing and budget reservation, usage recording, cache key stability, error mapping |
 | `prompting` | Every prompt renders with fixtures, version lock, token budgets |
 | `context` | Budget shrinking order, overflow error, state builders under 380 tokens on long inputs |
 | `decisions` | Policy modes, rotation averaging maths, thresholds per bucket, fallback paths, cache, decision log rows, circuit breaker |

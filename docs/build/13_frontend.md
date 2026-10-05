@@ -26,7 +26,7 @@ frontend/
 │   │   ├── design/              # design system picker, template upload, colour and font editor, preview
 │   │   ├── briefs/              # brief form
 │   │   ├── runs/                # run page: timeline, questions, plan review, slides, QA, downloads
-│   │   ├── admin/               # members, API keys, credentials, usage, decision policies (read-only)
+│   │   ├── admin/               # members, API keys, credentials, usage, data policies, org knowledge, model status, decision policies (read-only)
 │   │   └── settings/            # user preferences
 │   ├── lib/                     # formatters, hooks (useRunEvents), i18n setup
 │   └── styles.css               # Tailwind v4 entry, design tokens as CSS variables (light and dark)
@@ -34,6 +34,8 @@ frontend/
 ```
 
 ## 3. Routes and pages
+
+The full screen set, wireframes and the user stories each screen serves are in `26` (sections 3 to 5). This section lists the routes that the first frontend tickets build. Later routes (review links, comments, variants, diff, knowledge admin) follow `26`.
 
 | Route | Page | Main data |
 |---|---|---|
@@ -44,7 +46,7 @@ frontend/
 | `/p/:projectId/data` | File drop zone, file list with status, profile viewer (columns, semantic types, units, sample) with inline correction | `POST /files`, `PATCH /files/{id}/profile` |
 | `/p/:projectId/design` | Choose built-in family or upload template, preview grid, edit tokens | `/design-systems` |
 | `/runs/:runId` | Run page (section 5) | run, events (SSE), plan, decks |
-| `/admin/*` | Members, API keys, credentials, usage charts, audit log | admin endpoints |
+| `/admin/*` | Members, API keys, credentials, usage charts, audit log, data policies (`allow_training`, `allow_exploration`, research on or off, retention), org knowledge cards, model and adapter versions in use | admin endpoints, `/org/knowledge` |
 | `/settings` | Default family, audience, slide count | user prefs |
 
 ## 4. Brief form

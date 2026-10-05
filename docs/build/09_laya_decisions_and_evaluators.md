@@ -106,7 +106,7 @@ A second example, a judge:
 id: J_TITLE_SUPPORTED
 version: 1
 kind: judge
-used_by: [compose.check_copy, qa_repair.tier1]
+used_by: [compose.check_copy, qa.tier1]
 question:
   type: choice
   instructions: Does the exhibit data support the slide title's claim?
@@ -141,7 +141,14 @@ R = routing, G = guard, J = judge (Tier 1). "Options" lists the choice keys. All
 | `D_ICON_PICK` | R | compose.pick_assets | up to 8 icon names from the embedding shortlist | concept label and slide context (icon_state_v1) | embedding top-1 | Tier 3 icon-fit verdicts |
 | `D_TOOL_NEED` | R | LayaToolSelectorMiddleware | `answer`, `tool` | tool_state_v1 | bind all allowed tools | LLM behaviour with full tool list (`08`, 5.5) |
 | `D_TOOL_GROUP` | R | LayaToolSelectorMiddleware | up to 12 tool groups | tool_state_v1 | bind all allowed tools | successful tool calls (`08`, 5.5) |
-| `D_REPAIR_STRATEGY` | R | repair router, when a defect maps to more than one strategy | candidate strategy ids | defect code, evidence, slide summary (defect_state_v1) | default mapping (section 8) | which repair cleared the defect on re-QA |
+| `D_REPAIR_STRATEGY` | R | `qa_router`, when a finding maps to more than one strategy | candidate strategy ids | defect code, evidence, slide summary (defect_state_v1) | default mapping (section 8) | which repair cleared the defect on re-QA |
+| `D_DEFECT_OWNER` | R | `qa_router` (`27`, section 8.3), when provenance and the standard's default owner do not settle it | `data_analyst`, `engagement_manager`, `viz_designer`, `copywriter`, `art_director`, `repair_specialist` | finding code, evidence, element kind, slide summary (finding_state_v1) | standard's default owner | which owner's `RESULT` cleared the finding on re-verify |
+| `D_NEED_ROUTE` | R | orchestrator on `NEED`, when the need type maps to more than one owner | `data_analyst`, `researcher`, `viz_designer`, `engagement_manager`, `user` | need type, description, requesting agent, slide summary (need_state_v1) | type mapping (`27`, section 6.2) | which route satisfied the need without a repeat `NEED` |
+| `D_REVISION_ROUTE` | R | supervisor (W2) | `copywriter`, `viz_designer`, `art_director`, `data_analyst`, `engagement_manager`, `researcher`, `repair_specialist` | request text, selected slide and element summary (revision_state_v1) | supervisor LLM writes the `RevisionPlan` | user accepted the new version vs re-requested the same change |
+| `D_REVISION_SCOPE` | R | supervisor (W2) | `slide`, `section`, `deck` | same as above | supervisor LLM | same as above |
+| `D_RESEARCH_NEEDED` | R | planning, per analysis | `internal` (uploaded data covers it), `external` (needs research) | analysis question, data needed, table profile summary (analysis_state_v1) | rule: `external` when no table matches the needed series | research findings cited in the final deck vs removed by the user |
+| `D_REPAIR_STOP` | R | `qa_router`, after each repair round | `continue`, `accept` | open findings by severity, round, clearing rate of previous rounds (repair_state_v1) | rule: continue while blockers or majors are open and rounds remain | whether the next round cleared anything. Hard rule: never `accept` with an open blocker |
+| `D_POOL_ROUTE` | R | `ModelPool`, only when a small and a large LM pool both exist | `small` (14B), `large` (32B) | role, adapter, prompt id, input tokens, schema size, deck type (call_state_v1) | role default in `models.yaml` | counterfactual replay: the small pool's output passes the same checks as the large pool's (`24`, section 3.2) |
 | `J_ACTION_TITLE` | J | check_copy, Tier 1 | `insight` (states a finding or implication), `topic` (names a subject without a finding) | title text and archetype | judge LLM | corpus titles (positives), synthetic topic-only rewrites (negatives) |
 | `J_TITLE_SUPPORTED` | J | check_copy, Tier 1 | `supported`, `partly`, `unsupported` | title + exhibit data summary + facts (title_exhibit_state_v1) | judge LLM | synthetic number and entity swaps, teacher LLM |
 | `J_SO_WHAT` | J | Tier 1 | `clear`, `weak`, `missing` (implication for the audience) | title + commentary | judge LLM | corpus vs synthetic flattening, teacher LLM |
@@ -152,6 +159,8 @@ R = routing, G = guard, J = judge (Tier 1). "Options" lists the choice keys. All
 | `J_DENSITY` | J | Tier 1 | `light`, `right`, `heavy` | word counts per element + text | rule thresholds (look-and-feel) | corpus statistics, synthetic inflation |
 | `J_REGISTER` | J | Tier 1 | `consulting`, `casual`, `promotional` | title + commentary | judge LLM | corpus (consulting), synthetic casual and hype rewrites |
 | `J_CORPUS_LIKE` | J (info only) | Tier 1 | `corpus`, `generated` | structured slide description (slide_desc_state_v1) | none | corpus slide descriptions vs generated ones (TRD 11.4 discriminator). Reported, never blocks, watched for shortcut learning |
+
+Visual questions about rendered slide images (`V_FOCAL`, `V_CLUTTER`, `V_TEXT_ON_IMAGE`, `V_ICON_FIT`, `V_CHART_READABLE`, `V_CONSISTENT`, `V_PREMIUM`) are served by Laya-Vision with our own weights. Their catalogue is in `25`, section 4. Large candidate sets go to CLM rankers (section 10), not to Laya.
 
 ## 4. Policy modes and fallbacks
 
@@ -200,7 +209,7 @@ flowchart LR
   AGG --> T3{final round and visual budget?}
   T3 -- yes --> V[Tier 3 vision judge on PNGs]
   T3 -- no --> OUT
-  V --> OUT[QAReport]
+  V --> OUT[QAVerdict]
 ```
 
 | Tier | Runs on | Cost | Always on | Output |
@@ -215,6 +224,8 @@ Escalation rules:
 - Tier 1 flags `major` or `blocker`: confirm with Tier 2 before triggering a repair (avoids repairing false positives). If Tier 2 disagrees, log the disagreement (training signal) and keep Tier 2's verdict.
 - Deck-level judges always run on Tier 2 once per deck version: `J2_STORYLINE` (pyramid logic: governing thought supported by sections, sections by slides), `J2_EXEC_SUMMARY` (exec summary matches the body), `J2_FACTUALITY` (claims against facts and citations).
 - Tier 3 `V_VISUAL` rubric: alignment and grid, hierarchy (one focal element), clutter, legibility, imagery fit, premium look, chart readability. Each scored 1 to 5 with a short evidence note. A score of 2 or less on legibility or chart readability is `major`.
+
+Mapping to the visual inspector (`25`): Tier 0 covers inspector L1 (object model), L2 (rendered geometry), L3 (pixel checks) and L6a (object-model clicks). Tier 1 adds L4 (Laya-Vision judges on PNGs, batched, every round). Tier 3 is L5 (`df-vlm` rubric with regions). L7 flow checks run once per final deck. The `REPORT(QAVerdict)` and its findings go to the orchestrator's `qa_router` (`27`, section 8). Every finding carries the design standard id from the knowledge base (`28`, DS cards), which supplies severity, owner, strategies and acceptance checks.
 
 ### 6.1 Defect codes (Tier 0)
 
@@ -239,20 +250,24 @@ Tier 1 to 3 defect codes come from each judge's `defect` map in its YAML.
 
 ## 7. Repair strategies
 
-| Id | Does | Engine |
-|---|---|---|
-| `R_LINT_AUTOFIX` | Existing `qa.repair.lint_and_repair` (backlight, contrast, nudge) | D |
-| `R_REWRITE_TITLE` | Writer rewrites the title with judge evidence and the fact list | L |
-| `R_REWRITE_COMMENTARY` | Writer rewrites points or the source line | L |
-| `R_SHORTEN_TEXT` | Writer shortens to a word budget computed from the box size | L |
-| `R_SWITCH_EXHIBIT` | Re-run `choose()` excluding the current exhibit, reshape data | D |
-| `R_RELAYOUT` | Switch layout variant (commentary, KPI sidebar, full width) or move commentary below | D |
-| `R_ADD_IMAGERY` | Band header or image panel from the asset resolver | D + T |
-| `R_REORDER_SLIDES` | Move a slide within its section to fix a `jumps` pair | D |
-| `R_REFACT` | Recompute facts, fix token names in copy | D |
-| `R_NONE` | Accept and report | none |
+Each strategy has one owner agent (`27`, section 4). The `qa_router` sends the finding with its chosen strategy to that owner as `TASK(kind="repair")`. D = deterministic, L = LLM, T = tool.
 
-The repair router groups defects per slide, picks one strategy per defect (default mapping, or `D_REPAIR_STRATEGY` when the YAML lists several), applies deterministic repairs first, then LLM repairs in parallel per slide, increments `repair_round`, and returns to `render_deck`. Maximum rounds: `options.max_repair_rounds` (default 2).
+| Id | Does | Engine | Owner |
+|---|---|---|---|
+| `R_LINT_AUTOFIX` | Existing `qa.repair.lint_and_repair` (backlight, contrast, nudge) | D | repair_specialist |
+| `R_RELAYOUT` | Switch layout variant (commentary, KPI sidebar, full width) or move commentary below | D | repair_specialist |
+| `R_REWRITE_TITLE` | Rewrite the title with judge evidence and the fact list | L | copywriter |
+| `R_REWRITE_COMMENTARY` | Rewrite points or the source line | L | copywriter |
+| `R_SHORTEN_TEXT` | Shorten to a word budget computed from the box size | L | copywriter |
+| `R_SWITCH_EXHIBIT` | Re-run `choose()` excluding the current exhibit, reshape data | D | viz_designer |
+| `R_SIMPLIFY_EXHIBIT` | Fewer series (top N plus Other), fewer labels, drop gridlines, larger marks | D | viz_designer |
+| `R_ADD_EMPHASIS` | Highlight the element the title talks about (accent colour on one mark, others muted) or add one callout | D | viz_designer |
+| `R_ADD_IMAGERY` | Band header or image panel from the asset resolver | D + T | art_director |
+| `R_REORDER_SLIDES` | Move a slide within its section to fix a `jumps` pair | D | engagement_manager |
+| `R_REFACT` | Recompute facts, fix token names in copy | D | data_analyst |
+| `R_NONE` | Accept and report | none | none |
+
+The `qa_router` groups findings per (owner, slide), picks one strategy per finding (the standard's first strategy, or `D_REPAIR_STRATEGY` when several apply), dispatches deterministic repairs first and LLM repairs in parallel per slide, increments `repair_round`, re-renders and re-verifies incrementally. `D_REPAIR_STOP` decides whether another round is worth it. Maximum rounds: `options.max_repair_rounds` (default 2). Loop control (attempts, reroutes, regression revert) is in `27`, section 8.4.
 
 ## 8. Fine-tuning pipeline (self-supervised, D13)
 
@@ -316,10 +331,36 @@ Per decision id (Grafana, `16`): decisions per minute, abstention rate, fallback
 
 | Family | Gate |
 |---|---|
-| Routing (`D_DECK_TYPE`, `D_TABLE_ROLE`, `D_COLUMN_ROLE`, `D_FRAMEWORK_PICK` top-3 recall, `D_EXHIBIT_TIEBREAK`, `D_ICON_PICK`, `D_TOOL_NEED`, `D_TOOL_GROUP`, `D_REPAIR_STRATEGY`) | Accuracy at least 0.95 on accepted items at coverage at least 0.60, ECE at most 0.05. `D_FRAMEWORK_PICK`: top-3 recall at least 0.90 |
+| Routing (`D_DECK_TYPE`, `D_TABLE_ROLE`, `D_COLUMN_ROLE`, `D_FRAMEWORK_PICK` top-3 recall, `D_EXHIBIT_TIEBREAK`, `D_ICON_PICK`, `D_TOOL_NEED`, `D_TOOL_GROUP`, `D_REPAIR_STRATEGY`, `D_DEFECT_OWNER`, `D_NEED_ROUTE`, `D_REVISION_ROUTE`, `D_REVISION_SCOPE`, `D_RESEARCH_NEEDED`) | Accuracy at least 0.95 on accepted items at coverage at least 0.60, ECE at most 0.05. `D_FRAMEWORK_PICK`: top-3 recall at least 0.90 |
 | Guard (`D_GUARD_INJECTION`) | Injection recall at least 0.98 at false-positive rate at most 0.05. Otherwise it stays a pre-filter whose `instruction` answers are confirmed by the LLM |
 | Judges for blocker and major defects | Recall at least 0.90 and precision at least 0.75 on accepted items at coverage at least 0.50 |
 | Judges for minor defects | Precision at least 0.80 |
+| `D_REPAIR_STOP` | `accept` precision at least 0.95 (accepted rounds where another round would not have cleared a major), measured on counterfactual replays |
+| `D_POOL_ROUTE` | Pass rate of `small`-routed calls within 0.02 of the `large` pool on the same calls (replay), and at least 30% of calls routed `small` |
 | All | No slice (language, deck type, source group) more than 0.05 below the overall metric. S5 gold accuracy within 0.05 of the test split |
 
 Until a decision passes, it stays in `shadow` and the product relies on its fallback. This is the honest path: Laya earns each decision with measurements.
+
+## 10. CLM rankers and Laya-Vision (companion models)
+
+### 10.1 When CLM is used instead of Laya
+
+Laya answers a typed question with up to 12 described options. CLM-8B ranks large candidate sets and verifies best-of-N outputs (`24`, section 2). The port is the same `DecisionEngine` (`01`, section 5): `rank(ranker_id, state_text, candidates, ctx) -> list[Ranked]`. `HttpClm` calls `POST /v1/rank` on `clm-serve`. In lite mode, and whenever CLM is down, `rank()` falls back to embedding cosine over pgvector (or the in-process embedding index on laptops), so a CLM outage changes ranking quality, never run outcomes.
+
+### 10.2 Ranker catalogue
+
+| Ranker id | Head | Candidates | State | Used by | Training labels from | Gate |
+|---|---|---|---|---|---|---|
+| `framework-rank` | `df-clm-framework` | framework cards (`28`, F cards, about 75) | issue_state_v1 | engagement_manager: top 12 go to `D_FRAMEWORK_PICK` | `D_FRAMEWORK_PICK` outcomes, plan_review edits | top-12 recall at least 0.98 |
+| `exhibit-prior` | `df-clm-exhibit` | exhibit cards (`28`, EXH cards) | exhibit_state_v1 | viz_designer: prior score added to the selector's rule score | accepted exhibits, `R_SWITCH_EXHIBIT` outcomes, user regenerations | nDCG@5 at least 0.85 |
+| `icon-rank` | `df-clm-icon` | icon library (about 1,600) | icon_state_v1 | art_director: top 8 go to `D_ICON_PICK` | L4 `V_ICON_FIT` verdicts, user icon swaps | top-8 recall at least 0.95 |
+| `tool-rank` | `df-clm-tool` | all tool descriptions | tool_state_v1 | `LayaToolSelectorMiddleware` when more than 12 tools are allowed | successful tool calls (`21`, section 5.3) | recall@8 of the tool actually used at least 0.97 |
+| `kb-rank` | `df-clm-kb` | knowledge base cards returned by hybrid search | query plus role (kb_query_state_v1) | `kb.search` re-ranking (`28`, section 6) | cards cited in accepted outputs | recall@5 at least 0.90 on the KB retrieval eval |
+| `verifier` | `df-clm-verifier` | N generated outputs (titles, exec summaries, storyline variants) | task plus facts (verify_state_v1) | best-of-N selection in copywriter and engagement_manager | accepted vs rejected outputs from traces | top-1 pick beats random by at least 15 points and matches the LLM judge within 3 points |
+
+Candidate sets are versioned (`kb_version`, icon library version, tool registry hash). `clm-serve` caches candidate embeddings in its vector cache keyed by that version, so a ranking call embeds only the state text. Heads train in minutes on the frozen base encoder (`24`, section 5) and follow the same shadow, gate and promote path as Laya checkpoints (section 8.4).
+
+### 10.3 Laya-Vision
+
+The `V_*` questions in `25`, section 4 run on the `laya-vision` service through the `VisualJudge` port. They use the same policy modes (section 4), calibration (section 5), `decision_log` rows and promotion gates (section 9.2, judge rows) as Laya judges. The weights are `df-laya-vision`, trained by us (`25`, section 8). The upstream Laya-Vision checkpoint is licensed CC BY-NC-SA and is never shipped or used for training data.
+

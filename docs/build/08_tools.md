@@ -5,7 +5,7 @@
 | Style | Where | Who decides which tool | Example |
 |---|---|---|---|
 | Direct | Fixed graph nodes (most of the pipeline) | The graph (code) | `render_deck` calls `render.compile_pptx` then `render.preview` |
-| Agentic | Research sub-agent, slide regeneration with free-form instructions | Laya shortlists, the LLM chooses among the shortlist | "Find the 2025 Indian auto components market size with a source" |
+| Agentic | ReAct agents: `researcher`, and `supervisor` in revision mode (`20`) | Laya (and CLM `tool-rank` when more than 12 tools are allowed) shortlists, the LLM chooses among the shortlist | "Find the 2025 Indian auto components market size with a source" |
 
 Both go through one `ToolExecutor`, so validation, timeouts, caching, permissions and logging are identical.
 
@@ -62,13 +62,14 @@ Groups are kept at 12 or fewer so the Laya group-routing question stays well ins
 |---|---|---|
 | `data` | `profile_table`: column types and stats. `query_table`: filter, group, aggregate on a stored table with a typed query (no code). `pivot_table`. `make_dummy_series`: plausible editable dummy data with a DUMMY flag | read |
 | `calc` | `growth_rates` (CAGR, YoY). `bridge_decompose` (price-volume-mix, margin bridge). `share_of_total`. `benchmark_gap`. `value_at_stake` | none |
-| `knowledge` | `framework_lookup` (framework cards by id or query). `exemplar_search` (corpus slide descriptions for few-shot). `org_terms` (org terminology and banned phrases) | read |
+| `knowledge` | `kb_search` (cards by namespace and query, `28` section 6). `kb_get` (card by id). `exemplar_search` (corpus slide descriptions for few-shot). `org_terms` (org terminology and banned phrases). `framework_lookup` is kept as an alias of `kb_search(namespace="frameworks")` | read |
 | `viz` | `select_exhibit` (wraps `viz.select.choose`). `fit_text` (does a string fit a box at a size). `validate_exhibit_data` | none |
 | `assets` | `icon_search` (Lucide index). `flag_lookup`. `map_lookup` (Natural Earth country shapes). `image_search` (stock adapters). `generate_image` (T2I, GPU only). `illustration` (procedural isometric scenes) | read or external |
 | `research` | `web_search`. `fetch_url` (SSRF-guarded). `extract_facts` (LLM extraction with quotes). `cite` (create a Citation) | external |
 | `documents` | `reference_search` (search uploaded reference documents). `read_reference_section` | read |
 | `render` | `compile_pptx`. `preview` (PPTX to PNGs). `lint_deck` | write, read |
-| `qa` | `lookfeel_check`. `consistency_check`. `run_judges` | read |
+| `qa` | `lookfeel_check`. `consistency_check`. `run_judges`. `inspect_slide` (inspector L1 to L4 on one slide, `25`). `get_findings` and `slide_summary` (read-only, for the supervisor) | read |
+| `layout` | `relayout` (switch layout variant). `nudge_labels` (move labels and leaders off collisions). `fix_contrast` (ink or backlight per WCAG ratio). `snap_grid` (align to the 12-column grid and safe area). Owned by `repair_specialist` | none (returns a `LayoutPatch`) |
 | `storage` | `save_artifact` | write |
 
 Each tool lives in `deckforge/tools/impl/<group>.py`. Every tool has a unit test with a fake context and a schema round-trip test.
@@ -222,7 +223,7 @@ def build_research_agent(registry: ModelRegistry, org: OrgSettings, engine: Deci
                                                                              # cite, reference_search, read_reference_section,
                                                                              # query_table, growth_rates, framework_lookup
     return create_agent(
-        model=registry.chat_model("extractor", org=org),
+        model=registry.chat_model("extractor", adapter="df-researcher", org=org),   # role adapter, 07 section 3
         tools=tools,
         system_prompt=load_prompt("research.agent").system_text,
         response_format=ResearchOut,                                    # findings with citation ids
@@ -236,7 +237,7 @@ def build_research_agent(registry: ModelRegistry, org: OrgSettings, engine: Deci
             SummarizationMiddleware(model=registry.chat_model("extractor", org=org), trigger=("tokens", 24000),
                                     keep=("messages", 12)),
         ],
-        name="research_agent",
+        name="researcher",
     )
 ```
 
@@ -265,4 +266,5 @@ External MCP tools get the same executor treatment (validation, timeouts, loggin
 4. Register with `@tool(spec)`.
 5. Add a tool card (three example tasks) to `deckforge/tools/cards.yaml`.
 6. Tests: happy path, invalid args, timeout path (with a fake slow dependency), cache key stability.
-7. If the tool joins an agent, add it to the agent's tool list and regenerate the group descriptions.
+7. If the tool joins an agent, add it to the agent card's `tools` list (`20`, section 3) and regenerate the group descriptions.
+8. Follow the full lifecycle in `21`: design rules, sandbox mode, tool-use training data, the tool benchmark and versioning. No tool wraps another agent (`20`, section 4).

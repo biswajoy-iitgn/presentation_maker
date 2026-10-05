@@ -11,8 +11,9 @@ presentation_maker/
 ├── .gitattributes                 # (new) eol=lf
 ├── .env.example                   # (new) every DF_* variable with a safe default
 ├── config/                        # (new)
-│   ├── models.yaml                # role -> provider/model mapping (07)
-│   ├── models.cloud.yaml          # opt-in cloud profile
+│   ├── models.yaml                # role -> backend, model, adapter (07)
+│   ├── model_pools.yaml           # vLLM replicas, adapters, budgets (22)
+│   ├── utility.yaml               # orchestrator utility weights for counterfactual replay (24)
 │   └── limits.yaml                # quotas, rate limits, run limits (05)
 ├── prompts/                       # (new) versioned prompt files (07, section 6)
 │   ├── intake/ planning/ compose/ judge/ research/ repair/
@@ -32,18 +33,20 @@ presentation_maker/
 │   ├── data/                      # (new) pure: dummy data generator, calc recipes, column mapping rules
 │   ├── design/                    # (new) pure: palette maths (OKLab, contrast, ramps), sample preview deck spec
 │   ├── ingest/                    # (new) excel/csv profiling, template -> DesignSystem, pdf/docx text
-│   ├── knowledge/                 # (new) framework cards from FRAMEWORK_LIBRARY.md, embeddings, kb build
-│   ├── renderer/                  # (new) preview adapters: soffice (lite), http (server), rasterize (pypdfium2)
+│   │   ├── renderer/                  # (new) preview adapters: soffice (lite), http (server), rasterize (pypdfium2)
 │   ├── accounting/                # (new) usage ledger, quotas
 │   ├── llm/                       # (new) registry, adapters, structured output, usage accounting
 │   ├── prompting/                 # (new) prompt loader and renderer
 │   ├── context/                   # (new) ContextBuilder, budgets, compaction, retrieval
 │   ├── cache/                     # (new) cache layers and key builders
-│   ├── decisions/                 # (new) Laya engine adapters, question registry, decision log
+│   ├── decisions/                 # (new) Laya, CLM and Laya-Vision adapters, question registry, decision log
 │   │   └── questions/             # (new) one YAML per decision id (09)
 │   ├── evaluators/                # (new) cascade, judges, defect model glue
 │   ├── tools/                     # (new) ToolSpec, registry, executor, implementations, selector middleware
 │   ├── research/                  # (new) search adapters, fetch with SSRF guard, extraction, citations
+│   ├── agents/                    # (new) agent cards, factory, protocol (27), contracts, one folder per agent (20)
+│   ├── knowledge/                 # (new) KB schema, loader, search, kb build (28)
+│   ├── inspect/                   # (new) visual QA inspector: geometry, pixels, clicks, flow (25)
 │   ├── graphs/                    # (new) LangGraph state, nodes, subgraphs, builders
 │   ├── jobs/                      # (new) queue adapters, worker loop, job handlers
 │   ├── events/                    # (new) event model, bus adapters
@@ -61,10 +64,10 @@ presentation_maker/
 │   ├── docker/                    # Dockerfile.app, Dockerfile.renderer, Dockerfile.laya, Dockerfile.nginx
 │   ├── compose/                   # docker-compose.yml, profiles, .env.server.example
 │   ├── nginx/                     # nginx.conf, conf.d/deckforge.conf
-│   ├── litellm/                   # config.yaml
 │   ├── observability/             # otel-collector.yaml, prometheus.yml, grafana dashboards
 │   └── helm/                      # (P12) chart
-├── training/                      # (new) Laya data builders, fine-tune scripts, calibration (09)
+├── knowledge/                     # (new) KB cards as YAML, source of truth (28)
+├── training/                      # (new) DeckForge-LM, agents, Laya, CLM, Laya-Vision training (19, 24)
 ├── evals/                         # (new) golden briefs, judge datasets, eval configs (17)
 ├── examples/                      # existing
 ├── tests/
@@ -83,8 +86,8 @@ Imports flow downward only. A lint rule (T-0.4, `tests/unit/test_import_rules.py
 |---|---|---|
 | 0 Domain | `core`, `story`, `viz`, `render`, `qa`, `assets` (sources and treatment only), `data`, `design` | stdlib, pydantic, numpy, pandas, python-pptx, lxml, pillow, each other |
 | 1 Ports | `ports` | layer 0 |
-| 2 Services | `ingest`, `llm`, `prompting`, `context`, `cache`, `decisions`, `evaluators`, `tools`, `research`, `events`, `storage`, `knowledge`, `renderer`, `accounting` | layers 0 and 1, their own third-party libraries |
-| 3 Orchestration | `graphs`, `jobs`, `evals` | layers 0 to 2 |
+| 2 Services | `ingest`, `llm`, `prompting`, `context`, `cache`, `decisions`, `evaluators`, `tools`, `research`, `events`, `storage`, `knowledge`, `renderer`, `accounting`, `inspect` | layers 0 and 1, their own third-party libraries |
+| 3 Orchestration | `agents`, `graphs`, `jobs`, `evals` | layers 0 to 2 |
 | 4 Delivery | `api`, `cli`, `renderer_service`, `serve`, `doctor`, `bundle`, `cli_init` | layers 0 to 3 |
 | Cross-cutting | `settings`, `observability`, `security`, `db`, `wiring` | anything below delivery. `db` is imported by `jobs`, `api`, `accounting` and repositories only |
 | Test support | `testing` | anything. Production modules never import it, except `wiring.py` when `DF_TEST_PROFILE=fake` |
@@ -128,10 +131,12 @@ Rules:
 | `DF_BLOB_ROOT` | path | `{DF_DATA_DIR}/blobs` | FsBlobStore |
 | `DF_S3_ENDPOINT`, `DF_S3_BUCKET`, `DF_S3_REGION`, `DF_S3_ACCESS_KEY`, `DF_S3_SECRET_KEY` | str | empty | S3BlobStore |
 | `DF_MODELS_FILE` | path | `config/models.yaml` | llm |
-| `DF_LLM_GATEWAY_URL` | url or empty | empty | llm (server, OpenAI-compatible gateway) |
-| `DF_LLM_GATEWAY_KEY` | secret | empty | llm |
-| `ANTHROPIC_API_KEY` | secret | empty | llm, Anthropic adapter (standard SDK variable) |
-| `DF_ALLOW_CLOUD_LLM` | bool | `false` | llm: global switch, org setting must also allow |
+| `DF_MODEL_POOLS_FILE` | path | `config/model_pools.yaml` | llm: vLLM replicas, adapters, budgets |
+| `DF_POOL_API_KEY` | secret | empty | llm: bearer key for vLLM servers started with `--api-key` |
+| `DF_OLLAMA_URL` | url | `http://127.0.0.1:11434/v1` | llm (lite) |
+| `DF_CLM_URL` | url or empty | empty (lite), `http://clm:8700` | CLM ranking |
+| `DF_CLM_API_KEY` | secret | empty | CLM (`CLM_API_KEY` in the clm container) |
+| `DF_LAYA_VISION_URL` | url or empty | empty (lite), `http://laya-vision:8210` | visual judges |
 | `DF_LAYA_MODE` | `off`, `inproc`, `http` | `off` (lite), `http` (server) | decisions |
 | `DF_LAYA_URL` | url | `http://laya:8200` | HttpLaya |
 | `DF_LAYA_API_KEY` | secret | empty | HttpLaya, matches `LAYA_API_KEY` in the laya container |
@@ -157,7 +162,7 @@ Rules:
 | `DF_WORKER_DRAIN_S` | int | `600` | graceful shutdown wait |
 | `DF_RENDERER_INSTANCES` | int | CPU cores / 2 | renderer service pool size |
 | `DF_TEST_PROFILE` | `""` or `fake` | `""` | wiring: `fake` builds every port from `deckforge.testing` |
-| `DF_<SECRET>_FILE` | path | empty | for each secret above (`JWT_SECRET`, `SECRETS_KEY`, `LAYA_API_KEY`, `LLM_GATEWAY_KEY`, `S3_SECRET_KEY`, `OIDC_CLIENT_SECRET`, `SEARCH_API_KEY`): read the value from this file |
+| `DF_<SECRET>_FILE` | path | empty | for each secret above (`JWT_SECRET`, `SECRETS_KEY`, `LAYA_API_KEY`, `POOL_API_KEY`, `CLM_API_KEY`, `S3_SECRET_KEY`, `OIDC_CLIENT_SECRET`, `SEARCH_API_KEY`): read the value from this file |
 | `DF_RUN_MAX_CONCURRENCY` | int | `6` | LangGraph `max_concurrency` per run |
 | `DF_ORG_MAX_ACTIVE_RUNS` | int | `5` | queue admission |
 | `DF_LOG_LEVEL` | str | `INFO` | observability |

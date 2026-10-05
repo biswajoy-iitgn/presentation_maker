@@ -35,7 +35,7 @@ class ContextBuilder:
 3. If still over budget with only `none` sections left, raise `ContextOverflow` (a bug in the budget table, caught by tests).
 4. Return sections. The prompt renderer (`07`, section 6) places them into the template slots.
 
-`TokenCounter`: for open models, the HF `tokenizers` tokenizer of the served model when available locally (path in `config/models.yaml`), else `langchain_core.messages.utils.count_tokens_approximately`. For Anthropic, the `count_tokens` endpoint is not called per request (latency). The approximate counter with a 15% safety margin is used, and `llm_calls` records true usage so the margin can be tuned.
+`TokenCounter`: the HF `tokenizers` tokenizer of the served DeckForge-LM base (shipped with the model, path in `config/models.yaml`). All adapters share the base tokenizer, so one counter serves every role. `langchain_core.messages.utils.count_tokens_approximately` with a 15% safety margin is the fallback when the tokenizer file is missing (dev only), and `llm_calls` records true usage so the margin can be tuned.
 
 ## 3. Budget table
 
@@ -138,5 +138,6 @@ Order inside every rendered prompt:
 
 Effects:
 - vLLM automatic prefix caching reuses the KV cache for 1 to 3 across all calls of a run and across runs of the same org.
-- Anthropic: one `cache_control` breakpoint after section 2 (TTL 1 hour when the org runs many decks) and one after section 3 (TTL 5 minutes, reused by the 15 to 30 compose calls of a run). Prefixes shorter than the model's minimum cacheable length do not cache, which is expected for small prompts.
+- Prefix reuse only happens on the replica that holds the prefix, so `ModelPool` routes by prefix affinity (hash of sections 1 to 3 picks the replica, with load spill-over, `22` section 6). LoRA adapters change the KV, so the cache is per adapter: calls of the same agent within a run reuse each other's prefix, calls of different agents do not.
+- Knowledge base digests (`28`, section 6.4) go into section 2 for the agent's role and into section 3 for the task. They change only with a new `kb_version`, so they stay cached.
 - Never put timestamps, run ids or random ordering into sections 1 to 3. Serialise JSON with sorted keys.
